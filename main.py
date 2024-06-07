@@ -13,20 +13,18 @@ except:
 def display_title_bar():
     # Clears the terminal screen, and displays a title bar.
 
-    print("\t**********************************************")
-    print("\t______________________________________________")
-    print("\t**************   DWGMAGIC   ******************")
-    print("\t______________________________________________")
-    print("\t****  TECTONICA - Dimitar Baldzhiev  *********")
-    print("\t______________________________________________")
-    print("\t******************************************V2**")
+    print("\t  ╭──────────────────────────────────────────────╮")
+    print("\t  │        🪄  DWGMAGIC IS STARTING  🏰           │")
+    print("\t  ├──────────────────────────────────────────────┤")
+    print("\t  │        TECTONICA - Dimitar Baldzhiev         │")
+    print("\t  ╰──────────────────────────────────────────────╯")
 
 
 def main():
     path = sys.argv[1]
 
     # Print the path to be processed.
-    print(path)
+    print("\t  +++++ TARGET PROJECT: {}".format(path))
 
     # Display the title bar.
     display_title_bar()
@@ -42,5 +40,6 @@ def main():
 
 if __name__ == "__main__":
     if debugflag:
+        deb.trustedFolderCheck()
         deb.removePrevPP(sys.argv[1])
     main()

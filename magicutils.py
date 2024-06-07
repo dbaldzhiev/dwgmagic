@@ -9,15 +9,16 @@ from threading import Timer
 
 import joblib as jb
 from colorama import Back
-
 import config as cfg
-
+import miscutil as miscutil
 
 def get_dwg_files_in_directory(path):
     output = [file for file in os.listdir(path) if file.endswith(".dwg")]
     if len(output) < 1:
         sys.exit('THERE ARE NO FILES')
     return output
+
+
 
 # ordering the folder so it has the folders scripts, originals and derevitized and copying the dwgs in the proper places
 def preprocess():
@@ -42,11 +43,10 @@ def preprocess():
             print("Derevitized folder already exists")
 
     for fn in fns:
-        # print("COPYING " + fn)
+        print("COPYING " + fn)
         copy(path + "/" + fn, path + "/originals/" + fn)
         copy(path + "/" + fn, path + "/derevitized/" + fn)
         os.remove(path + "/" + fn)
-    print("TIDY COMPLETE")
 
 
 #The general PROJECT CLASS
@@ -212,15 +212,10 @@ class Project:
                     os.system('cls')
                 pass
 
-    def accVersion(self):
-        for key in cfg.accpathv:
-            if os.path.exists(cfg.accpathv[key]):
-                return cfg.accpathv[key]
-
     def __init__(self): 
         os.system("")
         self.filenames = os.listdir("{0}/derevitized/".format(os.getcwd()))
-        self.accpath = self.accVersion()
+        self.accpath = miscutil.accVersion()
         print(self.accpath)
         rgx_str = "(?!(?:.*-View-\d*)|(?:.*-rvt-))(^.*)(?:\.dwg$)"
         snl = [fname for fname in self.filenames if re.compile(rgx_str).match(fname) is not None]
