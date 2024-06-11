@@ -1,7 +1,7 @@
 =====TECTONICA=======
 
 ======DWGMAGIC=======
-=====version 0.4=====
+=====version 0.5=====
 by Dimitar Baldzhiev
 Overview:
 
@@ -28,3 +28,11 @@ MasterMerged.dwg: A DWG file with all the sheets bound and exploded "smartly".
 Contributions:
 
 This script was written by the original author and may have some bugs. The author welcomes contributions and suggestions for improvement. If you are interested in using the script or contributing code, please express your interest and contribute to the project.
+
+
+How to install: 
+1. Install Python
+2. run install_py-req.bat
+3. run DWGMAGIC.reg
+4. add dwgmagic2 folder to trusted folders in Autocad
+5. start merging :)

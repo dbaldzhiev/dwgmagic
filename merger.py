@@ -4,50 +4,12 @@ import shlex
 import subprocess as sp
 import sys
 import time
-from shutil import copy
 from threading import Timer
 
 import joblib as jb
 from colorama import Back
 import config as cfg
 import miscutil as miscutil
-
-def get_dwg_files_in_directory(path):
-    output = [file for file in os.listdir(path) if file.endswith(".dwg")]
-    if len(output) < 1:
-        sys.exit('THERE ARE NO FILES')
-    return output
-
-
-
-# ordering the folder so it has the folders scripts, originals and derevitized and copying the dwgs in the proper places
-def preprocess():
-    path = os.getcwd()
-    fns = get_dwg_files_in_directory(os.getcwd())
-    if not os.path.exists(str(path + "/scripts")):
-        try:
-            os.mkdir("scripts")
-        except:
-            print("Scripts folder already exists")
-
-    if not os.path.exists(str(path + "/originals")):
-        try:
-            os.mkdir("originals")
-        except:
-            print("Originals folder already exists")
-
-    if not os.path.exists(str(path + "/derevitized")):
-        try:
-            os.mkdir("derevitized")
-        except:
-            print("Derevitized folder already exists")
-
-    for fn in fns:
-        print("COPYING " + fn)
-        copy(path + "/" + fn, path + "/originals/" + fn)
-        copy(path + "/" + fn, path + "/derevitized/" + fn)
-        os.remove(path + "/" + fn)
-
 
 #The general PROJECT CLASS
 class Project:
@@ -216,7 +178,7 @@ class Project:
         os.system("")
         self.filenames = os.listdir("{0}/derevitized/".format(os.getcwd()))
         self.accpath = miscutil.accVersion()
-        print(self.accpath)
+        #print(self.accpath)
         rgx_str = "(?!(?:.*-View-\d*)|(?:.*-rvt-))(^.*)(?:\.dwg$)"
         snl = [fname for fname in self.filenames if re.compile(rgx_str).match(fname) is not None]
         snlIndx = [s.replace(".dwg", "") for s in snl]

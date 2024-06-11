@@ -1,14 +1,8 @@
-
 import os
 import sys
-import magicutils as mu
-try:
-    import debugscripts as deb
-
-    debugflag = True
-except:
-    debugflag = False
-
+import merger as m
+import miscutil as mu
+import debugscripts as deb
 
 def display_title_bar():
     # Clears the terminal screen, and displays a title bar.
@@ -20,26 +14,28 @@ def display_title_bar():
     print("\t  ╰──────────────────────────────────────────────╯")
 
 
-def main():
-    path = sys.argv[1]
-
-    # Print the path to be processed.
-    print("\t  +++++ TARGET PROJECT: {}".format(path))
+def main(path):
 
     # Display the title bar.
     display_title_bar()
+    deb.checks()     
 
     # Change the current working directory.
     os.chdir(path)
+
+    mu.removePrevPreprocess()
 
     # Preprocess the file.
     mu.preprocess()
 
     # Run the project.
-    mu.Project()
+    m.Project()
 
 if __name__ == "__main__":
-    if debugflag:
-        deb.trustedFolderCheck()
-        deb.removePrevPP(sys.argv[1])
-    main()
+    try:
+        # Print the path to be processed.
+        print("\t  +++++ TARGET PROJECT: {}".format(sys.argv[1]))
+    except:
+        sys.exit("ERROR! No path provided!")
+    main(sys.argv[1])
+
