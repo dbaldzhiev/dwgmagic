@@ -44,10 +44,12 @@ def removePrevPreprocess():
         # Catch error
         except:
             sys.exit(1)
-        print("\t  +++++ TIDY COMPLETE +++++")
+        print("+++++ TIDY COMPLETE +++++")
 
 # ordering the folder so it has the folders scripts, originals and derevitized and copying the dwgs in the proper places
 def preprocess():
+    print("──────────────────────────────────────────────")
+    removePrevPreprocess()
     path = os.getcwd()
     fns = get_dwg_files_in_directory(os.getcwd())
     if not os.path.exists(str(path + "/scripts")):
@@ -68,10 +70,10 @@ def preprocess():
         except:
             print("Derevitized folder already exists")
     
-    print("\t  +++++ COPYING {0} FILES +++++".format(len(fns)))
+    print("+++++ COPYING {0} FILES +++++".format(len(fns)))
     for fn in fns:
         #print("COPYING " + fn)
         shutil.copy(path + "/" + fn, path + "/originals/" + fn)
         shutil.copy(path + "/" + fn, path + "/derevitized/" + fn)
         os.remove(path + "/" + fn)
-
+    print("──────────────────────────────────────────────")

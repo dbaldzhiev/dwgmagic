@@ -12,12 +12,12 @@ def accVersion():
 
 def checks():
         command = "\"{acc}\" /s \"{path}/trustedFolderCheck.scr\"".format(acc=accVersion(), path=cfg.paths["dmm"])
-        print("\t  ──────────────────────────────────────────────")
-        print("\t  +++++ ACCORECONSOLE PATH: {} ++++++      ".format(accVersion()))
-        print("\t  +++++ CHECKING TRUSTED FOLDER: {} ++++++ ".format(command))
+        print("──────────────────────────────────────────────")
+        print("+++++ ACCORECONSOLE PATH: {} ++++++      ".format(accVersion()))
+        print("+++++ CHECKING TRUSTED FOLDER: {} ++++++ ".format(command))
         process = sp.Popen(shlex.split(command), stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
         output, err = process.communicate()
         #print(output)
         if "Unable to load C:\\dwgmagic2\\tectonica.dll assembly." in output:
-            print("\t  !!!! TRUSTED FOLDER IS NOT SET UP !!!!")
-        print("\t  ──────────────────────────────────────────────")
+            print("!!!! TRUSTED FOLDER IS NOT SET UP !!!!")
+        print("──────────────────────────────────────────────")

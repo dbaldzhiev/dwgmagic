@@ -23,8 +23,6 @@ def main(path):
     # Change the current working directory.
     os.chdir(path)
 
-    mu.removePrevPreprocess()
-
     # Preprocess the file.
     mu.preprocess()
 
@@ -34,7 +32,7 @@ def main(path):
 if __name__ == "__main__":
     try:
         # Print the path to be processed.
-        print("\t  +++++ TARGET PROJECT: {}".format(sys.argv[1]))
+        print("+++++ TARGET PROJECT: {}".format(sys.argv[1]))
     except:
         sys.exit("ERROR! No path provided!")
     main(sys.argv[1])

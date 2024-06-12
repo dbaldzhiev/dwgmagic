@@ -9,6 +9,7 @@ import joblib as jb
 from colorama import Back
 import config as cfg
 import checks
+import tqdm
 
 #The general PROJECT CLASS
 class Project:
@@ -119,9 +120,9 @@ class Project:
 
     def run_Project_script(self):
         command = "\"{acc}\" /s \"{path}/scripts/DWGMAGIC.scr\"".format(acc=self.accpath, path=os.getcwd())
-        print("======================================")
+        print("──────────────────────────────────────────────")
         print("+++++ RUNNING: {} ++++++".format(command))
-        print("======================================")
+        print("──────────────────────────────────────────────")
         process = sp.Popen(shlex.split(command), stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
         lines = []
         maxl = 10
@@ -160,6 +161,10 @@ class Project:
         while True:
             existance = list(zip(self.sheets, [os.path.isfile(s.cleanSheetFilePath) for s in self.sheets]))
             if all([ex for sh, ex in existance]) or time.time() > timeout:
+                print("──────────────────────────────────────────────")
+                print("All sheets derevitazation confirmed!")
+                print("──────────────────────────────────────────────")
+
                 if cfg.verbose:
                     print("\n".join(["{0} is {1}".format(e[0].cleanSheetFilePath, e[1]) for e in existance]))
                 break
@@ -192,11 +197,10 @@ class Project:
         self.generate_Manual_Master_Merge_Script()
         self.generate_Manual_Master_Merge_bat()
         self.cleanSheetsExistenceChecker()
-        print("======================================")
+        
         timeout = 3
         t = Timer(timeout, self.run_Project_script)
         t.start()
-
         prompt = "PRESS ENTER TO stop the automerge.\n"
         answer = input(prompt)
         if answer is not None:
@@ -232,13 +236,10 @@ class Sheet:
             sheet=self.sheetName,
             script=self.sheetCleanerScript)
         if cfg.verbose:
-            print(Back.GREEN)
-            print("###############")
-            print(
-                "CLEANING SHEET {sheet} with SCRIPT {script}".format(sheet=self.sheetName,
-                                                                     script=self.sheetCleanerScript))
-            print(command)
-            print(Back.RESET)
+            print("──────────────────────────────────────────────")
+            print("CLEANING SHEET {sheet} with SCRIPT {script}".format(sheet=self.sheetName, script=self.sheetCleanerScript))
+            print("{0}".format(command))
+            print("──────────────────────────────────────────────")
 
         process = sp.Popen(command, stdout=sp.PIPE)
 
@@ -289,7 +290,7 @@ class View:
             output.decode("utf-16")
 
     def getXfromV(self):
-        command = "{acc} /s {path}/scripts/CHECKER.scr /i {path}\derevitized\{view}.dwg".format(acc=self.acc, path=os.getcwd(), view=self.viewName)
+        command = r"{acc} /s {path}/scripts/CHECKER.scr /i {path}\derevitized\{view}.dwg".format(acc=self.acc, path=os.getcwd(), view=self.viewName)
 
         try:
             process = sp.Popen(command, stdout=sp.PIPE)
