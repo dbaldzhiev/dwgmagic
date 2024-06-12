@@ -5,11 +5,10 @@ import subprocess as sp
 import sys
 import time
 from threading import Timer
-
 import joblib as jb
 from colorama import Back
 import config as cfg
-import miscutil as miscutil
+import checks
 
 #The general PROJECT CLASS
 class Project:
@@ -177,9 +176,9 @@ class Project:
     def __init__(self): 
         os.system("")
         self.filenames = os.listdir("{0}/derevitized/".format(os.getcwd()))
-        self.accpath = miscutil.accVersion()
+        self.accpath = checks.accVersion()
         #print(self.accpath)
-        rgx_str = "(?!(?:.*-View-\d*)|(?:.*-rvt-))(^.*)(?:\.dwg$)"
+        rgx_str = r"(?!(?:.*-View-\d*)|(?:.*-rvt-))(^.*)(?:\.dwg$)"
         snl = [fname for fname in self.filenames if re.compile(rgx_str).match(fname) is not None]
         snlIndx = [s.replace(".dwg", "") for s in snl]
         self.sheetNamesList = [x for y, x in sorted(zip(snlIndx, snl))]
@@ -254,7 +253,7 @@ class Sheet:
         self.sheetName = sn.replace(".dwg", "")
         self.workingFile = sn
         self.sheetCleanerScript = "{0}_SHEET.scr".format(self.sheetName.upper())
-        self.viewNamesOnSheetList = list(filter(re.compile(str(self.sheetName) + "-View-\d+").match, project.filenames))
+        self.viewNamesOnSheetList = list(filter(re.compile(str(self.sheetName) + r"-View-\d+").match, project.filenames))
         print("SHEET {sheetname} ->> {views}".format(sheetname=sn, views=self.viewNamesOnSheetList))
         if cfg.threaded:
             self.viewsOnSheet = jb.Parallel(n_jobs=-1, batch_size=1)(
@@ -290,9 +289,7 @@ class View:
             output.decode("utf-16")
 
     def getXfromV(self):
-        command = "{acc} /s {path}/scripts/CHECKER.scr /i {path}\derevitized\{view}.dwg".format(acc=self.acc,
-                                                                                                path=os.getcwd(),
-                                                                                                view=self.viewName)
+        command = "{acc} /s {path}/scripts/CHECKER.scr /i {path}\derevitized\{view}.dwg".format(acc=self.acc, path=os.getcwd(), view=self.viewName)
 
         try:
             process = sp.Popen(command, stdout=sp.PIPE)
@@ -312,8 +309,8 @@ class View:
     def __init__(self, vn, project):
         self.acc = project.accpath
         self.viewName = vn.replace(".dwg", "")
-        self.viewIndx = str(re.compile("\d+-View-(\d+).dwg").search(vn).group(1))
-        self.parentSheetIndx = str(re.compile("(\d+)-View-\d+.dwg").search(vn).group(1))
+        self.viewIndx = str(re.compile(r"\d+-View-(\d+).dwg").search(vn).group(1))
+        self.parentSheetIndx = str(re.compile(r"(\d+)-View-\d+.dwg").search(vn).group(1))
         self.viewCleanerScript = "{0}.scr".format(self.viewName.upper())
         self.xrefs = [Xref(x[0], x[1]) for x in self.getXfromV()]
         self.generate_View_script()

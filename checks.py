@@ -1,12 +1,19 @@
-import miscutil
 import config as cfg
 import shlex
 import subprocess as sp
+import sys
+import os
+
+def accVersion():
+        for key in cfg.accpathv:
+            if os.path.exists(cfg.accpathv[key]):
+                return cfg.accpathv[key]
+        sys.exit('Cannot find accoreconsole.exe')
 
 def checks():
-        command = "\"{acc}\" /s \"{path}/trustedFolderCheck.scr\"".format(acc=miscutil.accVersion(), path=cfg.paths["dmm"])
+        command = "\"{acc}\" /s \"{path}/trustedFolderCheck.scr\"".format(acc=accVersion(), path=cfg.paths["dmm"])
         print("\t  ──────────────────────────────────────────────")
-        print("\t  +++++ ACCORECONSOLE PATH: {} ++++++      ".format(miscutil.accVersion()))
+        print("\t  +++++ ACCORECONSOLE PATH: {} ++++++      ".format(accVersion()))
         print("\t  +++++ CHECKING TRUSTED FOLDER: {} ++++++ ".format(command))
         process = sp.Popen(shlex.split(command), stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
         output, err = process.communicate()

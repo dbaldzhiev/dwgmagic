@@ -2,7 +2,7 @@ import os
 import sys
 import merger as m
 import miscutil as mu
-import debugscripts as deb
+import checks
 
 def display_title_bar():
     # Clears the terminal screen, and displays a title bar.
@@ -18,7 +18,7 @@ def main(path):
 
     # Display the title bar.
     display_title_bar()
-    deb.checks()     
+    checks.checks()     
 
     # Change the current working directory.
     os.chdir(path)

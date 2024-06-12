@@ -1,13 +1,6 @@
-import config as cfg    
 import os
 import sys
 import shutil
-
-def accVersion():
-        for key in cfg.accpathv:
-            if os.path.exists(cfg.accpathv[key]):
-                return cfg.accpathv[key]
-        sys.exit('Cannot find accoreconsole.exe')
 
 def get_dwg_files_in_directory(path):
     output = [file for file in os.listdir(path) if file.endswith(".dwg")]
