@@ -69,6 +69,11 @@ def preprocess():
             os.mkdir("derevitized")
         except:
             print("Derevitized folder already exists")
+    if not os.path.exists(str(path + "/logs")):
+        try:
+            os.mkdir("logs")
+        except:
+            print("Logs folder already exists")
     
     print("+++++ COPYING {0} FILES +++++".format(len(fns)))
     for fn in fns:

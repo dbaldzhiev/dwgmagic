@@ -19,5 +19,5 @@ def checks():
         output, err = process.communicate()
         #print(output)
         if "Unable to load C:\\dwgmagic2\\tectonica.dll assembly." in output:
-            print("!!!! TRUSTED FOLDER IS NOT SET UP !!!!")
+            sys.exit("!!!! TRUSTED FOLDER IS NOT SET UP !!!!")
         print("──────────────────────────────────────────────")

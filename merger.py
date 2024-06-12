@@ -9,7 +9,9 @@ import joblib as jb
 from colorama import Back
 import config as cfg
 import checks
-import tqdm
+#import tqdm
+import logging
+import logger as lg
 
 #The general PROJECT CLASS
 class Project:
@@ -119,9 +121,12 @@ class Project:
     #Running the master merge script
 
     def run_Project_script(self):
+        
+        mmlg = lg.newLog("MAIN_MERGER")
         command = "\"{acc}\" /s \"{path}/scripts/DWGMAGIC.scr\"".format(acc=self.accpath, path=os.getcwd())
         print("──────────────────────────────────────────────")
         print("+++++ RUNNING: {} ++++++".format(command))
+        logging.debug("+++++ RUNNING: {} ++++++".format(command))
         print("──────────────────────────────────────────────")
         process = sp.Popen(shlex.split(command), stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
         lines = []
@@ -133,6 +138,7 @@ class Project:
             line = process.stdout.readline()
             if line != "":
                 if line != "\n":
+                    #mmlg.debug(line.strip("\n"))
                     lines.append(line[:100] + ".." if len(line) > 100 else line.strip("\n"))
                     if len(lines) > maxl:
                         if writtenlines != 0:
@@ -144,14 +150,9 @@ class Project:
                         writtenlines = len(lines[-maxl:])
                         bb.append(writtenlines)
                         print(*ll, sep="\n")
-                    if cfg.vverbose:
-                        print(line.strip("\n"))
-        output, err = process.communicate()
-        if cfg.vverbose:
-            print(output)
         try:
             os.remove("{0}_MM.bak".format(os.path.basename(os.getcwd())))
-        except Exception as e:
+        except:
             pass
         print("DWG MAGIC COMPLETE")
 
@@ -206,7 +207,6 @@ class Project:
         if answer is not None:
             t.cancel()
 
-
 class Sheet:
 
     def generate_Sheet_script(self):
@@ -230,6 +230,7 @@ class Sheet:
         scr.close()
 
     def run_Sheet_cleaner(self):
+        slg = lg.newLog("SHEET_{sheet}".format(sheet=self.sheetName))
         command = "{acc} /i \"{path}/derevitized/{sheet}.dwg\" /s \"{path}/scripts/{script}\"".format(
             acc=self.acc,
             path=os.getcwd(),
@@ -241,12 +242,13 @@ class Sheet:
             print("{0}".format(command))
             print("──────────────────────────────────────────────")
 
-        process = sp.Popen(command, stdout=sp.PIPE)
+        process = sp.Popen(command, stdout=sp.PIPE, encoding='utf-16-le', errors='replace')
 
         output, err = process.communicate()
+        slg.debug("CLEANING SHEET {sheet} with SCRIPT {script}".format(sheet=self.sheetName, script=self.sheetCleanerScript))
+        slg.debug(output)
         os.remove("{0}/derevitized/{1}".format(os.getcwd(), self.workingFile))
-        if cfg.vverbose:
-            print(output.decode("utf-16"))
+
 
 
     def __init__(self, sn, project):
@@ -277,25 +279,27 @@ class View:
         scr.close()
 
     def run_View_cleaner(self):
+        vlg = lg.newLog('VIEW_{view}'.format(view=self.viewName))
         command = "{acc} /i \"{path}/derevitized/{view}.dwg\" /s \"{path}/scripts/{script}\"".format(
             acc=self.acc,
             path=os.getcwd(),
             view=self.viewName,
             script=self.viewCleanerScript)
+        vlg.debug("CLEANING VIEW {view} with SCRIPT {script}".format(view=self.viewName, script=self.viewCleanerScript))
+
         if cfg.verbose:
             print("CLEANING VIEW {view} with SCRIPT {script}".format(view=self.viewName, script=self.viewCleanerScript))
-        process = sp.Popen(command, stdout=sp.PIPE)
+        process = sp.Popen(command, stdout=sp.PIPE, encoding='utf-16-le', errors='replace')
         output, err = process.communicate()
-        if cfg.vverbose:
-            output.decode("utf-16")
+        vlg.debug(output)
 
     def getXfromV(self):
         command = r"{acc} /s {path}/scripts/CHECKER.scr /i {path}\derevitized\{view}.dwg".format(acc=self.acc, path=os.getcwd(), view=self.viewName)
 
         try:
-            process = sp.Popen(command, stdout=sp.PIPE)
+            process = sp.Popen(command, stdout=sp.PIPE, encoding='utf-16-le', errors='replace')
             cmdoutput, err = process.communicate()
-            cmdoutput = cmdoutput.decode("utf-16")
+            cmdoutput = cmdoutput
             xrefsRegex = re.compile("\"(.*)\" loaded: (.*)")
             xrefsList = xrefsRegex.findall(cmdoutput)
             output = xrefsList
