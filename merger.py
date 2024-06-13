@@ -126,7 +126,7 @@ class Project:
         command = "\"{acc}\" /s \"{path}/scripts/DWGMAGIC.scr\"".format(acc=self.accpath, path=os.getcwd())
         print("──────────────────────────────────────────────")
         print("+++++ RUNNING: {} ++++++".format(command))
-        logging.debug("+++++ RUNNING: {} ++++++".format(command))
+        mmlg.debug("+++++ RUNNING: {} ++++++".format(command))
         print("──────────────────────────────────────────────")
         process = sp.Popen(shlex.split(command), stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
         lines = []
@@ -154,6 +154,7 @@ class Project:
             os.remove("{0}_MM.bak".format(os.path.basename(os.getcwd())))
         except:
             pass
+        mmlg.debug("DWG MAGIC COMPLETE")
         print("DWG MAGIC COMPLETE")
 
     #checkin if all xrefs are done derevitizing and can be passed to master merge
