@@ -2,14 +2,11 @@ import os
 import re
 import shlex
 import subprocess as sp
-import sys
 import time
 from threading import Timer
 import joblib as jb
-from tqdm import tqdm
-import logging
 from rich.console import Console
-from rich.progress import track
+from rich.progress import track, Progress
 from jinja2 import Template, Environment, FileSystemLoader
 import config as cfg
 import checks
@@ -37,7 +34,7 @@ class Project:
         self.sheetNamesList = [x for y, x in sorted(zip(snlIndx, snl))]
         self.xrefXplodeToggle = True
         if cfg.threaded:
-            self.sheets = jb.Parallel(n_jobs=-1, batch_size=1, verbose=100)(
+            self.sheets = jb.Parallel(n_jobs=-1, batch_size=1)(
                 jb.delayed(Sheet)(s, self) for s in self.sheetNamesList)
         else:
             self.sheets = [Sheet(s, self) for s in self.sheetNamesList]
@@ -119,10 +116,33 @@ class Project:
         command = "\"{acc}\" /s \"{path}/scripts/DWGMAGIC.scr\"".format(acc=self.accpath, path=os.getcwd())
         console.print(f"Running: {command}", style="bold yellow")
         mmlg.debug(f"Running: {command}")
+
+        # Read the DWGMAGIC.scr file to count the total number of commands
+        with open("./scripts/DWGMAGIC.scr", "r") as file:
+            script_lines = file.readlines()
+        
+        total_commands = sum(1 for line in script_lines if line.strip())
+
         process = sp.Popen(shlex.split(command), stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
 
-        for line in track(process.stdout, description="Processing"):
-            console.print(line[:100] + ".." if len(line) > 100 else line.strip("\n"))
+        command_pattern = re.compile(r'^Command: (.+)$')
+        executed_commands = 0
+
+        with Progress() as progress:
+            task = progress.add_task("Processing", total=total_commands)
+            
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    match = command_pattern.match(output.strip())
+                    if match:
+                        executed_commands += 1
+                        progress.update(task, advance=1)
+            
+            progress.update(task, completed=total_commands)
+
         try:
             os.remove(f"{os.path.basename(os.getcwd())}_MM.bak")
         except:
