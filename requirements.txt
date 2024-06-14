@@ -1,3 +1,5 @@
 joblib
 colorama
 tqdm
+rich
+jinja2

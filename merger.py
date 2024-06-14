@@ -64,52 +64,41 @@ class Project:
 
     #Making MANUAL master merge script
     def generate_Manual_Master_Merge_Script(self):
-        scr = open("./scripts/MMM.scr", "w+")
-        scr.write("netload {0}/tectonica.dll\n".format(cfg.paths["dmm"]))
-        scr.write("visretain 0\n")
-        scr.write("xbind d *\n")
-        scr.write("xbind s *\n")
-        scr.write("xbind lt *\n")
-        if self.xrefXplodeToggle:
-            scr.write("tecbxt\n")
-        if not self.xrefXplodeToggle:
-            scr.write("bindtype 1\n")
-            scr.write("xref bind *\n")
-            scr.write("xplode all\n")
-            scr.write("\n")
-            scr.write("g\n")
-            scr.write("\n")
-            scr.write("(load(findfile \"ssx.lsp\"))\n")
-            for sheet in self.sheets:
-                for view in sheet.viewsOnSheet:
-                    scr.write("ssx\n")
-                    scr.write("\n")
-                    scr.write("block\n")
-                    scr.write("{0}-View-{1}\n".format(str(sheet.sheetName), view.viewIndx))
-                    scr.write("\n")
-                    scr.write("xplode p\n")
-                    scr.write("\n")
-                    scr.write("\n")
-        scr.write("-purge all * n\n")
-        scr.write("audit y\n")
-        scr.write("zoom all\n")
-        scr.write("saveas\n")
-        scr.write("2007\n")
-        scr.write("\"./{0}_MMM.dwg\"\n".format(os.path.basename(os.getcwd())))
-        scr.write("filedia 1\n")
-        scr.write("qsave\n")
-        scr.close()
+        env = Environment(
+            loader=FileSystemLoader(cfg.paths["dmm"]),
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
+        template = env.get_template('mmm_script_template.tmpl')
+        
+        script_content = template.render(
+            tectonica_path=cfg.paths["dmm"],
+            xrefXplodeToggle=self.xrefXplodeToggle,
+            sheets=self.sheets,
+            project_name=os.path.basename(os.getcwd())
+        )
+
+        with open("./scripts/MMM.scr", "w") as script_file:
+            script_file.write(script_content)
+
 
     #Making the bat file that uses manual master merge script
     def generate_Manual_Master_Merge_bat(self):
-        scr = open("./MANUALMERGE.bat", "w+")
-        scr.write("pushd %~d1%~p1\n")
-        scr.write("\"{acc}\" /i \"%cd%/{n}_MXR.dwg\" /s \"%cd%/scripts/MMM.scr\"\n".format(acc=self.accpath,
-                                                                                           n=os.path.basename(
-                                                                                               os.getcwd())))
-        scr.write("popd\n")
-        scr.write("pause\n")
-    
+        env = Environment(
+            loader=FileSystemLoader(cfg.paths["dmm"]),
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
+        template = env.get_template('manual_merge_bat_template.tmpl')
+        
+        bat_content = template.render(
+            acc=self.accpath,
+            project_name=os.path.basename(os.getcwd())
+        )
+
+        with open("./MANUALMERGE.bat", "w") as bat_file:
+            bat_file.write(bat_content)
+
     def cleanSheetsExistenceChecker(self):
         timeout = time.time() + cfg.deadline
         while True:
@@ -124,7 +113,7 @@ class Project:
                     print("Time left: {0}".format(timeout - time.time()))
                     print("\n".join(["{0} is {1}".format(e[0].cleanSheetFilePath, e[1]) for e in existance]))
                     time.sleep(1)
-
+                    
     def run_Project_script(self):
         mmlg = lg.newLog("MAIN_MERGER")
         command = "\"{acc}\" /s \"{path}/scripts/DWGMAGIC.scr\"".format(acc=self.accpath, path=os.getcwd())
