@@ -3,6 +3,9 @@ import sys
 import merger as m
 import miscutil as mu
 import checks
+from rich.console import Console
+from rich.progress import track
+
 
 def display_title_bar():
     # Clears the terminal screen, and displays a title bar.
