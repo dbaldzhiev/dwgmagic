@@ -17,4 +17,5 @@ accpathv = {
 verbose = False
 xrefXplodeToggle = False
 deadline = 120
-threaded = True
+sheetThreading = True
+viewThreading = False

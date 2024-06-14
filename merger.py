@@ -33,7 +33,7 @@ class Project:
         snlIndx = [s.replace(".dwg", "") for s in snl]
         self.sheetNamesList = [x for y, x in sorted(zip(snlIndx, snl))]
         self.xrefXplodeToggle = True
-        if cfg.threaded:
+        if cfg.sheetThreading:
             self.sheets = jb.Parallel(n_jobs=-1, batch_size=1)(
                 jb.delayed(Sheet)(s, self) for s in self.sheetNamesList)
         else:
@@ -158,7 +158,7 @@ class Sheet:
         self.sheetCleanerScript = f"{self.sheetName.upper()}_SHEET.scr"
         self.viewNamesOnSheetList = list(filter(re.compile(f"{self.sheetName}-View-\\d+").match, project.filenames))
 
-        console.print(f"Processing Sheet: {self.sheetName} -> Views: {self.viewNamesOnSheetList}", style="bold blue")
+        #console.print(f"Processing Sheet: {self.sheetName} -> Views: {self.viewNamesOnSheetList}", style="bold blue")
 
         self.viewsOnSheet = self.process_views(project)
 
@@ -169,7 +169,7 @@ class Sheet:
     def process_views(self, project):
         views = []
         try:
-            if cfg.threaded:
+            if cfg.viewThreading:
                 views = jb.Parallel(n_jobs=-1, batch_size=1)(
                     jb.delayed(View)(v, project) for v in self.viewNamesOnSheetList
                 )
@@ -225,7 +225,7 @@ class View:
         self.parentSheetIndx = re.compile(r"(\d+)-View-\d+.dwg").search(vn).group(1)
         self.viewCleanerScript = f"{self.viewName.upper()}.scr"
         
-        console.print(f"Processing View: {self.viewName}", style="bold blue")
+        #console.print(f"Processing View: {self.viewName}", style="bold blue")
 
         self.xrefs = self.get_xrefs_from_view()
         self.generate_View_script()
