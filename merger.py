@@ -1,16 +1,18 @@
-import os
+from rich.console import Console
+from rich.progress import Progress, Live, track
+from rich.tree import Tree
+import joblib as jb
 import re
+import os
+import time
 import shlex
 import subprocess as sp
-import time
-from threading import Timer
-import joblib as jb
-from rich.console import Console
-from rich.progress import track, Progress
-from jinja2 import Template, Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader
 import config as cfg
 import checks
 import logger as lg
+import script_generator as sg  # Import the script generator module
+
 
 console = Console()
 
@@ -19,9 +21,9 @@ class Project:
     def __init__(self):
         os.system("")
         self.setup()
-        self.generate_Project_Script()
-        self.generate_Manual_Master_Merge_Script()
-        self.generate_Manual_Master_Merge_bat()
+        sg.generate_Project_Script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets)  # Use function from script_generator
+        sg.generate_Manual_Master_Merge_Script(self.xrefXplodeToggle, self.sheets)  # Use function from script_generator
+        sg.generate_Manual_Master_Merge_bat(self.accpath)  # Use function from script_generator
         self.cleanSheetsExistenceChecker()
         self.run_Project_script()
 
@@ -39,63 +41,6 @@ class Project:
         else:
             self.sheets = [Sheet(s, self) for s in self.sheetNamesList]
     
-    #The scrtipt that attaches all xrefs and explodes them saves MASTERMERGED.DWG
-    def generate_Project_Script(self):
-        env = Environment(
-            loader=FileSystemLoader(cfg.paths["dmm"]),
-            trim_blocks=True,
-            lstrip_blocks=True
-        )
-        template = env.get_template('project_script_template.tmpl')
-        
-        script_content = template.render(
-            sheetNamesList=self.sheetNamesList,
-            tectonica_path=cfg.paths["dmm"],
-            project_name=os.path.basename(os.getcwd()),
-            xrefXplodeToggle=self.xrefXplodeToggle,
-            sheets=self.sheets
-        )
-
-        with open("./scripts/DWGMAGIC.scr", "w") as script_file:
-            script_file.write(script_content)
-
-    #Making MANUAL master merge script
-    def generate_Manual_Master_Merge_Script(self):
-        env = Environment(
-            loader=FileSystemLoader(cfg.paths["dmm"]),
-            trim_blocks=True,
-            lstrip_blocks=True
-        )
-        template = env.get_template('mmm_script_template.tmpl')
-        
-        script_content = template.render(
-            tectonica_path=cfg.paths["dmm"],
-            xrefXplodeToggle=self.xrefXplodeToggle,
-            sheets=self.sheets,
-            project_name=os.path.basename(os.getcwd())
-        )
-
-        with open("./scripts/MMM.scr", "w") as script_file:
-            script_file.write(script_content)
-
-
-    #Making the bat file that uses manual master merge script
-    def generate_Manual_Master_Merge_bat(self):
-        env = Environment(
-            loader=FileSystemLoader(cfg.paths["dmm"]),
-            trim_blocks=True,
-            lstrip_blocks=True
-        )
-        template = env.get_template('manual_merge_bat_template.tmpl')
-        
-        bat_content = template.render(
-            acc=self.accpath,
-            project_name=os.path.basename(os.getcwd())
-        )
-
-        with open("./MANUALMERGE.bat", "w") as bat_file:
-            bat_file.write(bat_content)
-
     def cleanSheetsExistenceChecker(self):
         timeout = time.time() + cfg.deadline
         while True:
@@ -162,7 +107,7 @@ class Sheet:
 
         self.viewsOnSheet = self.process_views(project)
 
-        self.generate_Sheet_script()
+        sg.generate_Sheet_script(self.sheetName, self.viewsOnSheet)  # Use function from script_generator
         self.run_Sheet_cleaner()
         self.cleanSheetFilePath = f"{os.getcwd()}/derevitized/{self.sheetName}_xrefed.dwg"
     
@@ -200,23 +145,6 @@ class Sheet:
             except Exception as e:
                 slg.error(f"Failed to remove file {self.workingFile}: {str(e)}")
             
-    def generate_Sheet_script(self):
-        env = Environment(
-            loader=FileSystemLoader(cfg.paths["dmm"]),
-            trim_blocks=True,
-            lstrip_blocks=True
-        )
-        template = env.get_template('sheet_script_template.tmpl')
-        
-        script_content = template.render(
-            viewsOnSheet=self.viewsOnSheet,
-            tectonica_path=cfg.paths["dmm"],
-            sheetName=self.sheetName
-        )
-
-        with open(f"./scripts/{self.sheetCleanerScript}", "w") as script_file:
-            script_file.write(script_content)
-
 class View:
     def __init__(self, vn, project):
         self.acc = project.accpath
@@ -228,7 +156,7 @@ class View:
         #console.print(f"Processing View: {self.viewName}", style="bold blue")
 
         self.xrefs = self.get_xrefs_from_view()
-        self.generate_View_script()
+        sg.generate_View_script(self.viewName)  # Use function from script_generator
         self.run_View_cleaner()
 
     def get_xrefs_from_view(self):
@@ -244,21 +172,6 @@ class View:
         except Exception as e:
             console.print(f"Error getting xrefs for view {self.viewName}: {str(e)}", style="bold red")
         return [Xref(name, path) for name, path in xrefs]
-
-    def generate_View_script(self):
-        env = Environment(
-            loader=FileSystemLoader(cfg.paths["dmm"]),
-            trim_blocks=True,
-            lstrip_blocks=True
-        )
-        template = env.get_template('view_script_template.tmpl')
-        
-        script_content = template.render(
-            viewName=self.viewName
-        )
-
-        with open(f"./scripts/{self.viewCleanerScript}", "w") as script_file:
-            script_file.write(script_content)
 
     def run_View_cleaner(self):
         vlg = lg.newLog(f"VIEW_{self.viewName}")
