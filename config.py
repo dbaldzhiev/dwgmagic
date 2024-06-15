@@ -14,8 +14,8 @@ accpathv = {
     "2024": "C:/Program Files/Autodesk/AutoCAD 2024/accoreconsole.exe",  # accoreconsole.exe path
     "2025": "C:/Program Files/Autodesk/AutoCAD 2025/accoreconsole.exe",  # accoreconsole.exe path
 }
-verbose = False
+verbose = True
 xrefXplodeToggle = False
 deadline = 120
 sheetThreading = True
-viewThreading = False
+viewThreading = True

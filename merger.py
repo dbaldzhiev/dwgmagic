@@ -5,9 +5,7 @@ import joblib as jb
 import re
 import os
 import time
-import shlex
 import subprocess as sp
-from jinja2 import Environment, FileSystemLoader
 import config as cfg
 import checks
 import logger as lg
@@ -16,6 +14,21 @@ import script_generator as sg  # Import the script generator module
 
 console = Console()
 
+def run_command(command, log=None, verbose=False):
+    if verbose:
+        console.print(f"Running Command: {" ".join(command)}", style="bold yellow")
+    try:
+        process = sp.Popen(command, stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
+        output, err = process.communicate()
+        if log:
+            log.debug(output)
+        return output, err
+    except Exception as e:
+        if log:
+            log.error(f"Failed to run command {command}: {str(e)}")
+        console.print(f"Error: {str(e)}", style="bold red")
+        return None, e
+    
 #The general PROJECT CLASS
 class Project:
     def __init__(self):
@@ -58,9 +71,13 @@ class Project:
                     
     def run_Project_script(self):
         mmlg = lg.newLog("MAIN_MERGER")
-        command = "\"{acc}\" /s \"{path}/scripts/DWGMAGIC.scr\"".format(acc=self.accpath, path=os.getcwd())
-        console.print(f"Running: {command}", style="bold yellow")
-        mmlg.debug(f"Running: {command}")
+        command = [
+            self.accpath,
+            "/s",
+            f"{os.getcwd()}/scripts/DWGMAGIC.scr"
+        ]
+        console.print(f"Running Command: {" ".join(command)}", style="bold yellow")
+        mmlg.debug(f"Running Command: {" ".join(command)}")
 
         # Read the DWGMAGIC.scr file to count the total number of commands
         with open("./scripts/DWGMAGIC.scr", "r") as file:
@@ -68,8 +85,8 @@ class Project:
         
         total_commands = sum(1 for line in script_lines if line.strip())
 
-        process = sp.Popen(shlex.split(command), stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
-
+        process = sp.Popen(command, stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
+        
         command_pattern = re.compile(r'^Command: (.+)$')
         executed_commands = 0
 
@@ -127,24 +144,25 @@ class Sheet:
     
     def run_Sheet_cleaner(self):
         slg = lg.newLog(f"SHEET_{self.sheetName}")
-        command = f"{self.acc} /i \"{os.getcwd()}/derevitized/{self.sheetName}.dwg\" /s \"{os.getcwd()}/scripts/{self.sheetCleanerScript}\""
+        command = [
+            self.acc,
+            "/i",
+            f"{os.getcwd()}/derevitized/{self.sheetName}.dwg",
+            "/s",
+            f"{os.getcwd()}/scripts/{self.sheetCleanerScript}"
+        ]
         if cfg.verbose:
             console.print(f"Cleaning Sheet {self.sheetName} with Script {self.sheetCleanerScript}", style="bold yellow")
-            console.print(f"Command: {command}", style="yellow")
+            console.print(f"Running Command: {" ".join(command)}", style="yellow")
 
-        try:
-            process = sp.Popen(command, stdout=sp.PIPE, encoding='utf-16-le', errors='replace')
-            output, err = process.communicate()
-            slg.debug(f"Cleaning Sheet {self.sheetName} with Script {self.sheetCleanerScript}")
-            slg.debug(output)
-        except Exception as e:
-            slg.error(f"Failed to clean sheet {self.sheetName}: {str(e)}")
-        finally:
+        output, err = run_command(command, log=slg, verbose=cfg.verbose)
+        if output is None:
+            slg.error(f"Failed to clean sheet {self.sheetName}: {str(err)}")
+        else:
             try:
                 os.remove(f"{os.getcwd()}/derevitized/{self.workingFile}")
             except Exception as e:
                 slg.error(f"Failed to remove file {self.workingFile}: {str(e)}")
-            
 class View:
     def __init__(self, vn, project):
         self.acc = project.accpath
@@ -155,42 +173,25 @@ class View:
         
         #console.print(f"Processing View: {self.viewName}", style="bold blue")
 
-        self.xrefs = self.get_xrefs_from_view()
         sg.generate_View_script(self.viewName)  # Use function from script_generator
         self.run_View_cleaner()
 
-    def get_xrefs_from_view(self):
-        command = f"{self.acc} /s {os.getcwd()}/scripts/CHECKER.scr /i {os.getcwd()}/derevitized/{self.viewName}.dwg"
-        xrefs = []
-        try:
-            process = sp.Popen(command, stdout=sp.PIPE, encoding='utf-16-le', errors='replace')
-            output, err = process.communicate()
-            xrefsRegex = re.compile(r"\"(.*)\" loaded: (.*)")
-            xrefs = xrefsRegex.findall(output)
-            if cfg.verbose:
-                console.print(f"View {self.viewName} has the following XREFS: {xrefs}", style="yellow")
-        except Exception as e:
-            console.print(f"Error getting xrefs for view {self.viewName}: {str(e)}", style="bold red")
-        return [Xref(name, path) for name, path in xrefs]
-
     def run_View_cleaner(self):
         vlg = lg.newLog(f"VIEW_{self.viewName}")
-        command = f"{self.acc} /i \"{os.getcwd()}/derevitized/{self.viewName}.dwg\" /s \"{os.getcwd()}/scripts/{self.viewCleanerScript}\""
+        #command = f"{self.acc} /i \"{os.getcwd()}/derevitized/{self.viewName}.dwg\" /s \"{os.getcwd()}/scripts/{self.viewCleanerScript}\""
+        command = [
+            self.acc,
+            "/i",
+            f"{os.getcwd()}/derevitized/{self.viewName}.dwg",
+            "/s",
+            f"{os.getcwd()}/scripts/{self.viewCleanerScript}"
+        ]
         vlg.debug(f"Cleaning View {self.viewName} with Script {self.viewCleanerScript}")
 
         if cfg.verbose:
             console.print(f"Cleaning View {self.viewName} with Script {self.viewCleanerScript}", style="bold yellow")
             console.print(f"Command: {command}", style="yellow")
 
-        try:
-            process = sp.Popen(command, stdout=sp.PIPE, encoding='utf-16-le', errors='replace')
-            output, err = process.communicate()
-            vlg.debug(output)
-        except Exception as e:
-            vlg.error(f"Failed to clean view {self.viewName}: {str(e)}")
-
-
-class Xref:
-    def __init__(self, name, path):
-        self.xrefName = name
-        self.xrefPath = path
+        output, err = run_command(command, log=vlg, verbose=cfg.verbose)
+        if output is None:
+            vlg.error(f"Failed to clean view {self.viewName}: {str(err)}")
