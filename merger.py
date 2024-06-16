@@ -1,6 +1,9 @@
 from rich.console import Console
 from rich.progress import Progress, Live, track
 from rich.tree import Tree
+from rich import box
+from rich.panel import Panel
+
 import joblib as jb
 import re
 import os
@@ -35,7 +38,10 @@ def log_and_print(message, log=None, style=None):
 class Project:
     def __init__(self):
         os.system("")
+        self.project_name=os.path.basename(os.getcwd())
         self.setup()
+        self.display_hierarchical_tree()
+        self.sheets = self.process_sheets()
         self.generate_scripts()
         self.cleanSheetsExistenceChecker()
         self.run_Project_script()
@@ -48,12 +54,15 @@ class Project:
         snlIndx = [s.replace(".dwg", "") for s in snl]
         self.sheetNamesList = [x for y, x in sorted(zip(snlIndx, snl))]
         self.xrefXplodeToggle = True
-        self.sheets = self.process_sheets()
 
-    def generate_scripts(self):
-        sg.generate_Project_Script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets)
-        sg.generate_Manual_Master_Merge_Script(self.xrefXplodeToggle, self.sheets)
-        sg.generate_Manual_Master_Merge_bat(self.accpath)
+    def display_hierarchical_tree(self):
+        tree = Tree(f" [bold blue]{self.project_name}[/bold blue]", guide_style="bold bright_blue")
+        for sheet_name in self.sheetNamesList:
+            sheet_branch = tree.add(f" [green]{sheet_name.replace('.dwg', '')}[/green]")
+            view_names_on_sheet = list(filter(re.compile(f"{sheet_name.replace('.dwg', '')}-View-\\d+").match, self.filenames))
+            for view_name in view_names_on_sheet:
+                sheet_branch.add(f" [yellow]{view_name.replace('.dwg', '')}[/yellow]")
+        console.print(tree)
 
     def process_sheets(self):
         if cfg.sheetThreading:
@@ -65,6 +74,11 @@ class Project:
                 return []
         else:
             return [Sheet(s, self) for s in self.sheetNamesList]
+
+    def generate_scripts(self):
+        sg.generate_Project_Script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets)
+        sg.generate_Manual_Master_Merge_Script(self.xrefXplodeToggle, self.sheets)
+        sg.generate_Manual_Master_Merge_bat(self.accpath)
 
     def cleanSheetsExistenceChecker(self):
         timeout = time.time() + cfg.deadline
