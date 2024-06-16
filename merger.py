@@ -1,14 +1,14 @@
-from rich.console import Console
-from rich.progress import Progress, Live, track
-from rich.tree import Tree
-from rich import box
-from rich.panel import Panel
-
-import joblib as jb
 import re
 import os
 import time
 import subprocess as sp
+import multiprocessing as mp
+
+from rich.console import Console
+from rich.progress import Progress, track
+from rich.tree import Tree
+from rich.panel import Panel
+
 import config as cfg
 import checks
 import logger as lg
@@ -38,7 +38,7 @@ def log_and_print(message, log=None, style=None):
 class Project:
     def __init__(self):
         os.system("")
-        self.project_name=os.path.basename(os.getcwd())
+        self.project_name = os.path.basename(os.getcwd())
         self.setup()
         self.display_hierarchical_tree()
         self.sheets = self.process_sheets()
@@ -67,8 +67,8 @@ class Project:
     def process_sheets(self):
         if cfg.sheetThreading:
             try:
-                return jb.Parallel(n_jobs=-1, batch_size=1)(
-                    jb.delayed(Sheet)(s, self) for s in self.sheetNamesList)
+                with mp.Pool(mp.cpu_count()) as pool:
+                    return pool.map(Sheet, [(s, self) for s in self.sheetNamesList])
             except Exception as e:
                 console.print(f"Error processing sheets: {str(e)}", style="bold red")
                 return []
@@ -136,7 +136,8 @@ class Project:
         log_and_print("DWG MAGIC COMPLETE", mmlg, style="bold green")
 
 class Sheet:
-    def __init__(self, sn, project):
+    def __init__(self, args):
+        sn, project = args
         self.acc = project.accpath
         self.sheetName = sn.replace(".dwg", "")
         self.workingFile = sn
@@ -153,12 +154,11 @@ class Sheet:
         views = []
         try:
             if cfg.viewThreading:
-                views = jb.Parallel(n_jobs=-1, batch_size=1)(
-                    jb.delayed(View)(v, project) for v in self.viewNamesOnSheetList
-                )
+                with mp.Pool(mp.cpu_count()) as pool:
+                    views = pool.map(View, [(v, project) for v in self.viewNamesOnSheetList])
             else:
                 for view in track(self.viewNamesOnSheetList, description=f"Processing Views for Sheet {self.sheetName}"):
-                    views.append(View(view, project))
+                    views.append(View((view, project)))
         except Exception as e:
             console.print(f"Error processing views for sheet {self.sheetName}: {str(e)}", style="bold red")
         return views
@@ -184,7 +184,8 @@ class Sheet:
                 slg.error(f"Failed to remove file {self.workingFile}: {str(e)}")
 
 class View:
-    def __init__(self, vn, project):
+    def __init__(self, args):
+        vn, project = args
         self.acc = project.accpath
         self.viewName = vn.replace(".dwg", "")
         self.viewIndx = re.compile(r"\d+-View-(\d+).dwg").search(vn).group(1)
