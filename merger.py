@@ -3,6 +3,7 @@ import os
 import time
 import subprocess as sp
 import multiprocessing as mp
+from threading import Thread
 
 from rich.console import Console
 from rich.progress import Progress, track
@@ -73,7 +74,7 @@ class Project:
                 console.print(f"Error processing sheets: {str(e)}", style="bold red")
                 return []
         else:
-            return [Sheet(s, self) for s in self.sheetNamesList]
+            return [Sheet((s, self)) for s in self.sheetNamesList]
 
     def generate_scripts(self):
         sg.generate_Project_Script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets)
@@ -154,8 +155,13 @@ class Sheet:
         views = []
         try:
             if cfg.viewThreading:
-                with mp.Pool(mp.cpu_count()) as pool:
-                    views = pool.map(View, [(v, project) for v in self.viewNamesOnSheetList])
+                threads = []
+                for view in self.viewNamesOnSheetList:
+                    thread = Thread(target=lambda v: views.append(View((v, project))), args=(view,))
+                    thread.start()
+                    threads.append(thread)
+                for thread in threads:
+                    thread.join()
             else:
                 for view in track(self.viewNamesOnSheetList, description=f"Processing Views for Sheet {self.sheetName}"):
                     views.append(View((view, project)))
