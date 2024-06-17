@@ -2,87 +2,45 @@ from jinja2 import Environment, FileSystemLoader
 import os
 import config as cfg
 
-def generate_Project_Script(sheetNamesList, xrefXplodeToggle, sheets):
-    env = Environment(
-        loader=FileSystemLoader(cfg.paths["dmm"]),
-        trim_blocks=True,
-        lstrip_blocks=True
-    )
-    template = env.get_template('project_script_template.tmpl')
-    
-    script_content = template.render(
-        sheetNamesList=sheetNamesList,
-        tectonica_path=cfg.paths["dmm"],
-        project_name=os.path.basename(os.getcwd()),
-        xrefXplodeToggle=xrefXplodeToggle,
-        sheets=sheets
-    )
+env = Environment(
+    loader=FileSystemLoader(cfg.paths["dmm"]),
+    trim_blocks=True,
+    lstrip_blocks=True
+)
 
-    with open("./scripts/DWGMAGIC.scr", "w") as script_file:
+def generate_script(template_name, output_path, **context):
+    template = env.get_template(template_name)
+    script_content = template.render(context)
+
+    with open(output_path, "w") as script_file:
         script_file.write(script_content)
 
-def generate_Manual_Master_Merge_Script(xrefXplodeToggle, sheets):
-    env = Environment(
-        loader=FileSystemLoader(cfg.paths["dmm"]),
-        trim_blocks=True,
-        lstrip_blocks=True
-    )
-    template = env.get_template('mmm_script_template.tmpl')
-    
-    script_content = template.render(
-        tectonica_path=cfg.paths["dmm"],
-        xrefXplodeToggle=xrefXplodeToggle,
-        sheets=sheets,
-        project_name=os.path.basename(os.getcwd())
-    )
+def generate_project_script(sheet_names_list, xref_xplode_toggle, sheets):
+    generate_script('project_script_template.tmpl', './scripts/DWGMAGIC.scr',
+                    sheetNamesList=sheet_names_list,
+                    tectonica_path=cfg.paths["dmm"],
+                    project_name=os.path.basename(os.getcwd()),
+                    xrefXplodeToggle=xref_xplode_toggle,
+                    sheets=sheets)
 
-    with open("./scripts/MMM.scr", "w") as script_file:
-        script_file.write(script_content)
+def generate_manual_master_merge_script(xref_xplode_toggle, sheets):
+    generate_script('mmm_script_template.tmpl', './scripts/MMM.scr',
+                    tectonica_path=cfg.paths["dmm"],
+                    xrefXplodeToggle=xref_xplode_toggle,
+                    sheets=sheets,
+                    project_name=os.path.basename(os.getcwd()))
 
-def generate_Manual_Master_Merge_bat(accpath):
-    env = Environment(
-        loader=FileSystemLoader(cfg.paths["dmm"]),
-        trim_blocks=True,
-        lstrip_blocks=True
-    )
-    template = env.get_template('manual_merge_bat_template.tmpl')
-    
-    bat_content = template.render(
-        acc=accpath,
-        project_name=os.path.basename(os.getcwd())
-    )
+def generate_manual_master_merge_bat(accpath):
+    generate_script('manual_merge_bat_template.tmpl', './MANUALMERGE.bat',
+                    acc=accpath,
+                    project_name=os.path.basename(os.getcwd()))
 
-    with open("./MANUALMERGE.bat", "w") as bat_file:
-        bat_file.write(bat_content)
+def generate_sheet_script(sheet_name, views_on_sheet):
+    generate_script('sheet_script_template.tmpl', f'./scripts/{sheet_name.upper()}_SHEET.scr',
+                    viewsOnSheet=views_on_sheet,
+                    tectonica_path=cfg.paths["dmm"],
+                    sheetName=sheet_name)
 
-def generate_Sheet_script(sheetName, viewsOnSheet):
-    env = Environment(
-        loader=FileSystemLoader(cfg.paths["dmm"]),
-        trim_blocks=True,
-        lstrip_blocks=True
-    )
-    template = env.get_template('sheet_script_template.tmpl')
-    
-    script_content = template.render(
-        viewsOnSheet=viewsOnSheet,
-        tectonica_path=cfg.paths["dmm"],
-        sheetName=sheetName
-    )
-
-    with open(f"./scripts/{sheetName.upper()}_SHEET.scr", "w") as script_file:
-        script_file.write(script_content)
-
-def generate_View_script(viewName):
-    env = Environment(
-        loader=FileSystemLoader(cfg.paths["dmm"]),
-        trim_blocks=True,
-        lstrip_blocks=True
-    )
-    template = env.get_template('view_script_template.tmpl')
-    
-    script_content = template.render(
-        viewName=viewName
-    )
-
-    with open(f"./scripts/{viewName.upper()}.scr", "w") as script_file:
-        script_file.write(script_content)
+def generate_view_script(view_name):
+    generate_script('view_script_template.tmpl', f'./scripts/{view_name.upper()}.scr',
+                    viewName=view_name)

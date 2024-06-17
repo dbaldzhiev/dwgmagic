@@ -4,20 +4,14 @@ import subprocess as sp
 import sys
 import os
 
-def accVersion():
-    """
-    Returns the path to accoreconsole.exe if it exists, exits otherwise.
-    """
-    for key in cfg.accpathv:
-        if os.path.exists(cfg.accpathv[key]):
-            return cfg.accpathv[key]
+def acc_version():
+    for path in cfg.accpathv.values():
+        if os.path.exists(path):
+            return path
     sys.exit('Cannot find accoreconsole.exe')
 
 def checks():
-    """
-    Checks if the trusted folder is set up by executing a script using accoreconsole.exe.
-    """
-    acc_path = accVersion()
+    acc_path = acc_version()
     command = f"\"{acc_path}\" /s \"{cfg.paths['dmm']}/trustedFolderCheck.scr\""
     
     print("──────────────────────────────────────────────")

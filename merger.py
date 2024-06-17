@@ -49,7 +49,7 @@ class Project:
 
     def setup(self):
         self.filenames = os.listdir(f"{os.getcwd()}/derevitized/")
-        self.accpath = checks.accVersion()
+        self.accpath = checks.acc_version()
         rgx_str = r"(?!(?:.*-View-\d*)|(?:.*-rvt-))(^.*)(?:\.dwg$)"
         snl = [fname for fname in self.filenames if re.compile(rgx_str).match(fname) is not None]
         snlIndx = [s.replace(".dwg", "") for s in snl]
@@ -77,9 +77,9 @@ class Project:
             return [Sheet((s, self)) for s in self.sheetNamesList]
 
     def generate_scripts(self):
-        sg.generate_Project_Script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets)
-        sg.generate_Manual_Master_Merge_Script(self.xrefXplodeToggle, self.sheets)
-        sg.generate_Manual_Master_Merge_bat(self.accpath)
+        sg.generate_project_script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets)
+        sg.generate_manual_master_merge_script(self.xrefXplodeToggle, self.sheets)
+        sg.generate_manual_master_merge_bat(self.accpath)
 
     def cleanSheetsExistenceChecker(self):
         timeout = time.time() + cfg.deadline
@@ -147,7 +147,7 @@ class Sheet:
 
         self.viewsOnSheet = self.process_views(project)
 
-        sg.generate_Sheet_script(self.sheetName, self.viewsOnSheet)
+        sg.generate_sheet_script(self.sheetName, self.viewsOnSheet)
         self.run_Sheet_cleaner()
         self.cleanSheetFilePath = f"{os.getcwd()}/derevitized/{self.sheetName}_xrefed.dwg"
     
@@ -198,7 +198,7 @@ class View:
         self.parentSheetIndx = re.compile(r"(\d+)-View-\d+.dwg").search(vn).group(1)
         self.viewCleanerScript = f"{self.viewName.upper()}.scr"
         
-        sg.generate_View_script(self.viewName)
+        sg.generate_view_script(self.viewName)
         self.run_View_cleaner()
 
     def run_View_cleaner(self):

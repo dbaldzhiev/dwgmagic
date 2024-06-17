@@ -3,14 +3,12 @@ import sys
 import shutil
 
 def get_dwg_files_in_directory(directory):
-    """Return a list of .dwg files in the specified directory."""
     dwg_files = [file for file in os.listdir(directory) if file.endswith(".dwg")]
     if not dwg_files:
         sys.exit('THERE ARE NO FILES')
     return dwg_files
 
 def safe_remove(path):
-    """Safely remove a file or directory."""
     try:
         if os.path.isfile(path):
             os.remove(path)
@@ -21,7 +19,6 @@ def safe_remove(path):
         sys.exit(1)
 
 def remove_previous_preprocess(base_path):
-    """Remove all files and directories except the originals folder and restore files from originals."""
     originals_path = os.path.join(base_path, "originals")
     
     if os.path.exists(originals_path):
@@ -37,7 +34,6 @@ def remove_previous_preprocess(base_path):
         print("+++++ TIDY COMPLETE +++++")
 
 def create_directory(path):
-    """Create a directory if it does not exist."""
     if not os.path.exists(path):
         try:
             os.mkdir(path)
@@ -45,14 +41,12 @@ def create_directory(path):
             print(f"Failed to create {path}: {exc}")
 
 def preprocess():
-    """Main preprocessing function."""
     print("──────────────────────────────────────────────")
     
     base_path = os.getcwd()
     remove_previous_preprocess(base_path)
     dwg_files = get_dwg_files_in_directory(base_path)
     
-    # Create required directories
     for folder in ["scripts", "originals", "derevitized", "logs"]:
         create_directory(os.path.join(base_path, folder))
     
