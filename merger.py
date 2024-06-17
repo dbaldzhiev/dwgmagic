@@ -78,9 +78,9 @@ class Project:
             return [Sheet((s, self)) for s in self.sheetNamesList]
 
     def generate_scripts(self):
-        sg.generate_project_script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets)
-        sg.generate_manual_master_merge_script(self.xrefXplodeToggle, self.sheets)
-        sg.generate_manual_master_merge_bat(self.accpath)
+        sg.generate_project_script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets, log_dir=self.log_dir)
+        sg.generate_manual_master_merge_script(self.xrefXplodeToggle, self.sheets, log_dir=self.log_dir)
+        sg.generate_manual_master_merge_bat(self.accpath, log_dir=self.log_dir)
 
     def cleanSheetsExistenceChecker(self):
         timeout = time.time() + cfg.deadline
@@ -108,17 +108,17 @@ class Project:
 
         with open("./scripts/DWGMAGIC.scr", "r") as file:
             script_lines = file.readlines()
-        
+
         total_commands = sum(1 for line in script_lines if line.strip())
 
         process = sp.Popen(command, stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
-        
+
         command_pattern = re.compile(r'^Command: (.+)$')
         executed_commands = 0
 
         with Progress() as progress:
             task = progress.add_task("Processing", total=total_commands)
-            
+
             while True:
                 output = process.stdout.readline()
                 if output == '' and process.poll() is not None:
@@ -128,7 +128,7 @@ class Project:
                     if match:
                         executed_commands += 1
                         progress.update(task, advance=1)
-            
+
             progress.update(task, completed=total_commands)
 
         try:
@@ -148,10 +148,10 @@ class Sheet:
 
         self.viewsOnSheet = self.process_views(project)
 
-        sg.generate_sheet_script(self.sheetName, self.viewsOnSheet)
+        sg.generate_sheet_script(self.sheetName, self.viewsOnSheet, log_dir=project.log_dir)
         self.run_Sheet_cleaner()
         self.cleanSheetFilePath = f"{os.getcwd()}/derevitized/{self.sheetName}_xrefed.dwg"
-    
+
     def process_views(self, project):
         views = []
         try:
@@ -169,7 +169,7 @@ class Sheet:
         except Exception as e:
             console.print(f"Error processing views for sheet {self.sheetName}: {str(e)}", style="bold red")
         return views
-    
+
     def run_Sheet_cleaner(self):
         slg = lg.setup_logger(f"SHEET_{self.sheetName}")
         command = [
@@ -198,8 +198,8 @@ class View:
         self.viewIndx = re.compile(r"\d+-View-(\d+).dwg").search(vn).group(1)
         self.parentSheetIndx = re.compile(r"(\d+)-View-\d+.dwg").search(vn).group(1)
         self.viewCleanerScript = f"{self.viewName.upper()}.scr"
-        
-        sg.generate_view_script(self.viewName)
+
+        sg.generate_view_script(self.viewName, log_dir=project.log_dir)
         self.run_View_cleaner()
 
     def run_View_cleaner(self):

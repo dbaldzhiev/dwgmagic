@@ -17,9 +17,9 @@ def main(path):
     log_dir = os.path.join(path, "logs")
     mu.cleanup_old_logs(log_dir)  # Move old logs to a backup directory before setting up new logger
     display_title_bar()
-    checks.checks()
     os.chdir(path)
     mu.preprocess(log_dir=log_dir)
+    checks.checks(log_dir=log_dir)  # Pass log_dir to checks
     m.Project(log_dir=log_dir)
 
 if __name__ == "__main__":
