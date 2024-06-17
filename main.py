@@ -6,37 +6,23 @@ import checks
 from rich.console import Console
 from rich.progress import track
 
-
 def display_title_bar():
-    # Clears the terminal screen, and displays a title bar.
-
     print("\t  ╭──────────────────────────────────────────────╮")
     print("\t  │        🪄  DWGMAGIC IS STARTING  🏰          │")
     print("\t  ├──────────────────────────────────────────────┤")
     print("\t  │        TECTONICA - Dimitar Baldzhiev         │")
     print("\t  ╰──────────────────────────────────────────────╯")
 
-
 def main(path):
-
-    # Display the title bar.
+    log_dir = os.path.join(path, "logs")
+    mu.cleanup_old_logs(log_dir)  # Move old logs to a backup directory before setting up new logger
     display_title_bar()
-    checks.checks()     
-
-    # Change the current working directory.
+    checks.checks()
     os.chdir(path)
-
-    # Preprocess the file.
-    mu.preprocess()
-
-    # Run the project.
-    m.Project()
+    mu.preprocess(log_dir=log_dir)
+    m.Project(log_dir=log_dir)
 
 if __name__ == "__main__":
-    try:
-        # Print the path to be processed.
-        print("+++++ TARGET PROJECT: {}".format(sys.argv[1]))
-    except:
+    if len(sys.argv) < 2:
         sys.exit("ERROR! No path provided!")
     main(sys.argv[1])
-

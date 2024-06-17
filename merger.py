@@ -37,8 +37,9 @@ def log_and_print(message, log=None, style=None):
         console.print(message, style=style)
 
 class Project:
-    def __init__(self):
+    def __init__(self, log_dir="logs"):
         os.system("")
+        self.log_dir = log_dir
         self.project_name = os.path.basename(os.getcwd())
         self.setup()
         self.display_hierarchical_tree()
@@ -97,7 +98,7 @@ class Project:
                     time.sleep(1)
 
     def run_Project_script(self):
-        mmlg = lg.newLog("MAIN_MERGER")
+        mmlg = lg.setup_logger("MAIN_MERGER", log_dir=self.log_dir)
         command = [
             self.accpath,
             "/s",
@@ -170,7 +171,7 @@ class Sheet:
         return views
     
     def run_Sheet_cleaner(self):
-        slg = lg.newLog(f"SHEET_{self.sheetName}")
+        slg = lg.setup_logger(f"SHEET_{self.sheetName}")
         command = [
             self.acc,
             "/i",
@@ -202,7 +203,7 @@ class View:
         self.run_View_cleaner()
 
     def run_View_cleaner(self):
-        vlg = lg.newLog(f"VIEW_{self.viewName}")
+        vlg = lg.setup_logger(f"VIEW_{self.viewName}")
         command = [
             self.acc,
             "/i",

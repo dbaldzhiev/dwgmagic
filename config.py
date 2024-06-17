@@ -11,3 +11,7 @@ xrefXplodeToggle = False
 deadline = 120
 sheetThreading = True
 viewThreading = False
+
+# New configuration parameters
+log_encoding = "utf-16-le"
+log_level = "DEBUG"

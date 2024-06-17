@@ -1,6 +1,9 @@
 from jinja2 import Environment, FileSystemLoader
 import os
 import config as cfg
+from logger import setup_logger
+
+logger = setup_logger("SCRIPT_GENERATOR", log_dir=os.path.join(cfg.paths["dmm"], "logs"))
 
 env = Environment(
     loader=FileSystemLoader(cfg.paths["dmm"]),
@@ -14,6 +17,7 @@ def generate_script(template_name, output_path, **context):
 
     with open(output_path, "w") as script_file:
         script_file.write(script_content)
+    logger.info("Generated script %s", output_path)
 
 def generate_project_script(sheet_names_list, xref_xplode_toggle, sheets):
     generate_script('project_script_template.tmpl', './scripts/DWGMAGIC.scr',
