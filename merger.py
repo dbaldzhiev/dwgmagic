@@ -157,7 +157,7 @@ class Sheet:
                     task = progress.add_task(f"Processing Views for Sheet {self.sheet_name}", total=len(self.view_names_on_sheet_list))
                     threads = []
                     for view in self.view_names_on_sheet_list:
-                        thread = Thread(target=self.process_view, args=(view, project, views, progress, task))
+                        thread = Thread(target=self.process_sheet_view, args=(view, project, views, progress, task))
                         thread.start()
                         threads.append(thread)
                     for thread in threads:
@@ -172,7 +172,7 @@ class Sheet:
                     progress.advance(task)
         return views
 
-    def process_view(self, view, project, views, progress, task):
+    def process_sheet_view(self, view, project, views, progress, task):
         views.append(View.process_view((view, project)))
         progress.advance(task)
 
