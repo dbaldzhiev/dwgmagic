@@ -1,4 +1,3 @@
-# merger.py
 import re
 import os
 import time
@@ -40,10 +39,10 @@ class Project:
         self.project_name = os.path.basename(os.getcwd())
         self.setup_environment()
         self.display_hierarchical_tree()
-        self.sheets = self.process_sheets()
         self.generate_scripts()
-        self.confirm_sheets_existence()
-        self.run_project_script()
+        self.process_views()
+        self.process_sheets()
+        self.merge_results()
 
     def setup_environment(self):
         self.filenames = os.listdir(f"{os.getcwd()}/derevitized/")
@@ -59,49 +58,33 @@ class Project:
             sheet_branch = tree.add(f" [wheat1]{sheet_name}[/wheat1]")
             view_names_on_sheet = list(filter(re.compile(f"{sheet_name.replace('.dwg', '')}-View-\\d+").match, self.filenames))
             for view_name in view_names_on_sheet:
-                view_number= re.search(f"{sheet_name.replace(".dwg",'')}-View-(.+).dwg",view_name).group(1)
+                view_number= re.search(f"{sheet_name.replace('.dwg','')}-View-(.+).dwg", view_name).group(1)
                 view_branch = sheet_branch.add(f" [sky_blue2]{view_name}[/sky_blue2]")
-                regggex = f"{sheet_name.replace(".dwg",'')}-.+-rvt-{(view_number)}.+.dwg" 
+                regggex = f"{sheet_name.replace('.dwg','')}-.*-rvt-{view_number}.*.dwg" 
                 xrefs_in_view= list(filter(re.compile(regggex).match, self.filenames))
                 for xref in xrefs_in_view:
                     view_branch.add(f" [blue]{xref}[/blue]")
-
         console.print(tree)
 
-    def process_sheets(self):
-        results = []
-        if cfg.sheetThreading:
-            try:
-                with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
-                    task = progress.add_task("Processing Sheets", total=len(self.sheet_names_list))
-                    for sheet in pool.imap_unordered(Sheet.process_sheet, [(s, self) for s in self.sheet_names_list]):
-                        results.append(sheet)
-                        progress.advance(task)
-            except Exception as e:
-                console.print(f"Error processing sheets: {str(e)}", style="bold red")
-        else:
-            results = [Sheet.process_sheet((s, self)) for s in self.sheet_names_list]
-        return results
-
     def generate_scripts(self):
-        sg.generate_project_script(self.sheet_names_list, self.xrefXplodeToggle, self.sheets, log_dir=self.log_dir)
-        sg.generate_manual_master_merge_script(self.xrefXplodeToggle, self.sheets, log_dir=self.log_dir)
+        sg.generate_project_script(self.sheet_names_list, self.xrefXplodeToggle, [], log_dir=self.log_dir)
+        sg.generate_manual_master_merge_script(self.xrefXplodeToggle, [], log_dir=self.log_dir)
         sg.generate_manual_master_merge_bat(self.accpath, log_dir=self.log_dir)
 
-    def confirm_sheets_existence(self):
-        timeout = time.time() + cfg.deadline
-        while True:
-            existence = [(s, os.path.isfile(s.clean_sheet_file_path)) for s in self.sheets]
-            if all(ex[1] for ex in existence) or time.time() > timeout:
-                log_and_print("All sheets derevitization confirmed!", style="bold green")
-                break
-            else:
-                if cfg.verbose:
-                    log_and_print(f"Time left: {timeout - time.time()}", None)
-                    log_and_print("\n".join([f"{s.clean_sheet_file_path} is {ex}" for s, ex in existence]), None)
-                time.sleep(1)
+    def process_views(self):
+        with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
+            task = progress.add_task("Processing Views", total=len(self.filenames))
+            view_files = [view for view in self.filenames if re.match(r".*-View-\d+\.dwg$", view)]
+            pool.map(View.process_view, [(view, self.accpath, self.log_dir) for view in view_files])
+            progress.update(task, advance=len(view_files))
 
-    def run_project_script(self):
+    def process_sheets(self):
+        with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
+            task = progress.add_task("Processing Sheets", total=len(self.sheet_names_list))
+            pool.map(Sheet.process_sheet, [(sheet, self.accpath, self.log_dir, self.filenames) for sheet in self.sheet_names_list])
+            progress.update(task, advance=len(self.sheet_names_list))
+
+    def merge_results(self):
         mmlg = lg.setup_logger("MAIN_MERGER", log_dir=self.log_dir)
         command = [
             self.accpath,
@@ -140,50 +123,29 @@ class Project:
         log_and_print("DWG MAGIC COMPLETE", mmlg, style="bold green")
 
 class Sheet:
-    def __init__(self, sheet_name, project):
-        self.acc = project.accpath
+    def __init__(self, sheet_name, acc, log_dir, filenames):
+        self.acc = acc
         self.sheet_name = sheet_name.replace(".dwg", "")
         self.working_file = sheet_name
+        self.filenames = filenames
+        self.set_view_names_on_sheet_list()
         self.sheet_cleaner_script = f"{self.sheet_name.upper()}_SHEET.scr"
-        self.view_names_on_sheet_list = list(filter(re.compile(f"{self.sheet_name}-View-\\d+").match, project.filenames))
-        self.views_on_sheet = self.process_views(project)
-        sg.generate_sheet_script(self.sheet_name, self.views_on_sheet, log_dir=project.log_dir)
-        self.run_sheet_cleaner()
-        self.clean_sheet_file_path = f"{os.getcwd()}/derevitized/{self.sheet_name}_xrefed.dwg"
+        self.generate_script(log_dir)
+        self.run_sheet_cleaner(log_dir)
 
     @staticmethod
     def process_sheet(args):
-        return Sheet(*args)
+        sheet_name, acc, log_dir, filenames = args
+        Sheet(sheet_name, acc, log_dir, filenames)
 
-    def process_views(self, project):
-        views = []
-        if cfg.viewThreading:
-            try:
-                with Progress() as progress:
-                    task = progress.add_task(f"Processing Views for Sheet {self.sheet_name}", total=len(self.view_names_on_sheet_list))
-                    threads = []
-                    for view in self.view_names_on_sheet_list:
-                        thread = Thread(target=self.process_sheet_view, args=(view, project, views, progress, task))
-                        thread.start()
-                        threads.append(thread)
-                    for thread in threads:
-                        thread.join()
-            except Exception as e:
-                console.print(f"Error processing views for sheet {self.sheet_name}: {str(e)}", style="bold red")
-        else:
-            with Progress() as progress:
-                task = progress.add_task(f"Processing Views for Sheet {self.sheet_name}", total=len(self.view_names_on_sheet_list))
-                for view in self.view_names_on_sheet_list:
-                    views.append(View.process_view((view, project)))
-                    progress.advance(task)
-        return views
+    def set_view_names_on_sheet_list(self):
+        self.view_names_on_sheet_list = list(filter(re.compile(f"{self.sheet_name}-View-\\d+").match, self.filenames))
 
-    def process_sheet_view(self, view, project, views, progress, task):
-        views.append(View.process_view((view, project)))
-        progress.advance(task)
+    def generate_script(self, log_dir):
+        sg.generate_sheet_script(self.sheet_name, self.view_names_on_sheet_list, log_dir=log_dir)
 
-    def run_sheet_cleaner(self):
-        slg = lg.setup_logger(f"SHEET_{self.sheet_name}")
+    def run_sheet_cleaner(self, log_dir):
+        slg = lg.setup_logger(f"SHEET_{self.sheet_name}", log_dir=log_dir)
         command = [
             self.acc,
             "/i",
@@ -202,21 +164,23 @@ class Sheet:
                 slg.error(f"Failed to remove file {self.working_file}: {str(e)}")
 
 class View:
-    def __init__(self, view_name, project):
-        self.acc = project.accpath
+    def __init__(self, view_name, acc, log_dir):
+        self.acc = acc
         self.view_name = view_name.replace(".dwg", "")
-        self.view_indx = re.search(r"\d+-View-(\d+).dwg", view_name).group(1)
-        self.parent_sheet_indx = re.search(r"(\d+)-View-\d+.dwg", view_name).group(1)
         self.view_cleaner_script = f"{self.view_name.upper()}.scr"
-        sg.generate_view_script(self.view_name, log_dir=project.log_dir)
-        self.run_view_cleaner()
+        self.generate_script(log_dir)
+        self.run_view_cleaner(log_dir)
 
     @staticmethod
     def process_view(args):
-        return View(*args)
+        view_name, acc, log_dir = args
+        View(view_name, acc, log_dir)
 
-    def run_view_cleaner(self):
-        vlg = lg.setup_logger(f"VIEW_{self.view_name}")
+    def generate_script(self, log_dir):
+        sg.generate_view_script(self.view_name, log_dir=log_dir)
+
+    def run_view_cleaner(self, log_dir):
+        vlg = lg.setup_logger(f"VIEW_{self.view_name}", log_dir=log_dir)
         command = [
             self.acc,
             "/i",
@@ -224,12 +188,10 @@ class View:
             "/s",
             f"{os.getcwd()}/scripts/{self.view_cleaner_script}"
         ]
-        vlg.debug(f"Cleaning View {self.view_name} with Script {self.view_cleaner_script}")
         log_and_print(f"Cleaning View {self.view_name} with Script {self.view_cleaner_script}", vlg, style="bold yellow")
         output, err = run_command(command, log=vlg, verbose=cfg.verbose)
         if output is None:
             vlg.error(f"Failed to clean view {self.view_name}: {str(err)}")
 
 if __name__ == "__main__":
-    # Main execution logic for merger can go here if needed
-    pass
+    Project()
