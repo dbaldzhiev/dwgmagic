@@ -1,3 +1,4 @@
+# checks.py
 import config as cfg
 import shlex
 import subprocess as sp
@@ -12,12 +13,11 @@ def acc_version():
     sys.exit('Cannot find accoreconsole.exe')
 
 def checks(log_dir=None):
-    if log_dir is None:
-        log_dir = os.path.join(cfg.paths["dmm"], "logs")
+    log_dir = log_dir or os.path.join(cfg.DMM_PATH, "logs")
     logger = setup_logger("CHECKS", log_dir=log_dir)
 
     acc_path = acc_version()
-    command = f"\"{acc_path}\" /s \"{cfg.paths['dmm']}/trustedFolderCheck.scr\""
+    command = f"\"{acc_path}\" /s \"{cfg.DMM_PATH}/trustedFolderCheck.scr\""
 
     logger.info("ACCORECONSOLE PATH: %s", acc_path)
     logger.info("CHECKING TRUSTED FOLDER: %s", command)
@@ -29,6 +29,3 @@ def checks(log_dir=None):
         sys.exit("TRUSTED FOLDER IS NOT SET UP")
 
     logger.info("Trusted folder check complete")
-
-if __name__ == "__main__":
-    checks()

@@ -1,3 +1,4 @@
+# miscutil.py
 import os
 import sys
 import shutil
@@ -26,16 +27,13 @@ def safe_remove(path):
 
 def remove_previous_preprocess(base_path):
     originals_path = os.path.join(base_path, "originals")
-    
     if os.path.exists(originals_path):
         for item in os.listdir(base_path):
             item_path = os.path.join(base_path, item)
             if item != "originals":
                 safe_remove(item_path)
-        
         for file in os.listdir(originals_path):
             shutil.copy(os.path.join(originals_path, file), os.path.join(base_path, file))
-        
         safe_remove(originals_path)
         if logger:
             logger.info("TIDY COMPLETE")
