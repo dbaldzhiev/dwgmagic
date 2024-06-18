@@ -4,7 +4,6 @@ from config import log_encoding, log_level
 
 def setup_logger(name, log_dir="logs"):
     os.makedirs(log_dir, exist_ok=True)
-
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, log_level))
 

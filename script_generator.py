@@ -5,14 +5,13 @@ from logger import setup_logger
 
 # Initialize the Jinja2 environment globally
 env = Environment(
-    loader=FileSystemLoader(cfg.paths["dmm"]),
+    loader=FileSystemLoader(cfg.DMM_PATH),
     trim_blocks=True,
     lstrip_blocks=True
 )
 
 def setup_script_logger(log_dir=None):
-    if log_dir is None:
-        log_dir = os.path.join(cfg.paths["dmm"], "logs")
+    log_dir = log_dir or os.path.join(cfg.DMM_PATH, "logs")
     return setup_logger("SCRIPT_GENERATOR", log_dir=log_dir)
 
 def generate_script(template_name, output_path, logger, **context):
@@ -27,7 +26,7 @@ def generate_project_script(sheet_names_list, xref_xplode_toggle, sheets, log_di
     logger = setup_script_logger(log_dir)
     generate_script('project_script_template.tmpl', './scripts/DWGMAGIC.scr', logger,
                     sheetNamesList=sheet_names_list,
-                    tectonica_path=cfg.paths["dmm"],
+                    tectonica_path=cfg.DMM_PATH,
                     project_name=os.path.basename(os.getcwd()),
                     xrefXplodeToggle=xref_xplode_toggle,
                     sheets=sheets)
@@ -35,7 +34,7 @@ def generate_project_script(sheet_names_list, xref_xplode_toggle, sheets, log_di
 def generate_manual_master_merge_script(xref_xplode_toggle, sheets, log_dir=None):
     logger = setup_script_logger(log_dir)
     generate_script('mmm_script_template.tmpl', './scripts/MMM.scr', logger,
-                    tectonica_path=cfg.paths["dmm"],
+                    tectonica_path=cfg.DMM_PATH,
                     xrefXplodeToggle=xref_xplode_toggle,
                     sheets=sheets,
                     project_name=os.path.basename(os.getcwd()))
@@ -50,7 +49,7 @@ def generate_sheet_script(sheet_name, views_on_sheet, log_dir=None):
     logger = setup_script_logger(log_dir)
     generate_script('sheet_script_template.tmpl', f'./scripts/{sheet_name.upper()}_SHEET.scr', logger,
                     viewsOnSheet=views_on_sheet,
-                    tectonica_path=cfg.paths["dmm"],
+                    tectonica_path=cfg.DMM_PATH,
                     sheetName=sheet_name)
 
 def generate_view_script(view_name, log_dir=None):

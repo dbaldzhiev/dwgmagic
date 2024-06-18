@@ -8,12 +8,11 @@ from threading import Thread
 from rich.console import Console
 from rich.progress import Progress, track
 from rich.tree import Tree
-from rich.panel import Panel
 
 import config as cfg
 import checks
 import logger as lg
-import script_generator as sg  # Import the script generator module
+import script_generator as sg
 
 console = Console()
 
