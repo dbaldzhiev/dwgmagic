@@ -70,7 +70,7 @@ class Project:
         if cfg.sheetThreading:
             try:
                 with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
-                    task = progress.add_task("Processing Sheets", total=len(self.sheetNamesList))
+                    task = progress.add_task("Processing Sheets           ", total=len(self.sheetNamesList))
                     for sheet in pool.imap_unordered(Sheet, [(s, self) for s in self.sheetNamesList]):
                         results.append(sheet)
                         progress.advance(task)
@@ -120,10 +120,12 @@ class Project:
         executed_commands = 0
 
         with Progress() as progress:
-            task = progress.add_task("Processing the Merge", total=total_commands)
+            task = progress.add_task("Processing the Merge        ", total=total_commands)
 
             while True:
                 output = process.stdout.readline()
+                log_and_print(f"{(output.strip())}", mmlg, style="bold yellow")
+
                 if output == '' and process.poll() is not None:
                     break
                 if output:
