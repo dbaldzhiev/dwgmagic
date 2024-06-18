@@ -1,3 +1,4 @@
+# script_generator.py
 from jinja2 import Environment, FileSystemLoader
 import os
 import config as cfg
@@ -17,7 +18,6 @@ def setup_script_logger(log_dir=None):
 def generate_script(template_name, output_path, logger, **context):
     template = env.get_template(template_name)
     script_content = template.render(context)
-
     with open(output_path, "w") as script_file:
         script_file.write(script_content)
     logger.info("Generated script %s", output_path)

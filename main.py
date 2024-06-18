@@ -1,31 +1,39 @@
+# main.py
 import os
 import sys
+import argparse
 import merger as m
 import miscutil as mu
 import checks
+import config as cfg
 from rich.console import Console
-from rich.progress import track
 
 def display_title_bar():
     title_bar = """
     ╭──────────────────────────────────────────────╮
-    │        🪄  DWGMAGIC IS STARTING  🏰          │
+    │              🪄  DWGMAGIC  🏰               │
     ├──────────────────────────────────────────────┤
     │        TECTONICA - Dimitar Baldzhiev         │
     ╰──────────────────────────────────────────────╯
     """
     print(title_bar)
 
-def main(path):
+def parse_args():
+    parser = argparse.ArgumentParser(description="DWGMAGIC Toolset")
+    parser.add_argument("path", help="Path to the project directory")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    return parser.parse_args()
+
+def main(path, verbose):
+    cfg.verbose = verbose
     log_dir = os.path.join(path, "logs")
-    mu.cleanup_old_logs(log_dir)  # Move old logs to a backup directory before setting up new logger
+    mu.cleanup_old_logs(log_dir)
     display_title_bar()
     os.chdir(path)
     mu.preprocess(log_dir=log_dir)
-    checks.checks(log_dir=log_dir)  # Pass log_dir to checks
+    checks.checks(log_dir=log_dir)
     m.Project(log_dir=log_dir)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit("ERROR! No path provided!")
-    main(sys.argv[1])
+    args = parse_args()
+    main(args.path, args.verbose)

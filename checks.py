@@ -1,3 +1,4 @@
+# checks.py
 import config as cfg
 import shlex
 import subprocess as sp
@@ -28,6 +29,3 @@ def checks(log_dir=None):
         sys.exit("TRUSTED FOLDER IS NOT SET UP")
 
     logger.info("Trusted folder check complete")
-
-if __name__ == "__main__":
-    checks()
