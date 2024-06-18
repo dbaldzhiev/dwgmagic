@@ -39,7 +39,7 @@ class Project:
         self.log_dir = log_dir
         self.project_name = os.path.basename(os.getcwd())
         self.setup_environment()
-        #self.display_hierarchical_tree()
+        self.display_hierarchical_tree()
         self.sheets = self.process_sheets()
         self.generate_scripts()
         self.confirm_sheets_existence()
@@ -54,12 +54,18 @@ class Project:
         self.xrefXplodeToggle = True
 
     def display_hierarchical_tree(self):
-        tree = Tree(f" [bold blue]{self.project_name}[/bold blue]", guide_style="bold bright_blue")
+        tree = Tree(f" [bold orange1]{self.project_name}[/bold orange1]", guide_style="bold orange1")
         for sheet_name in self.sheet_names_list:
-            sheet_branch = tree.add(f" [green]{sheet_name.replace('.dwg', '')}[/green]")
+            sheet_branch = tree.add(f" [wheat1]{sheet_name}[/wheat1]")
             view_names_on_sheet = list(filter(re.compile(f"{sheet_name.replace('.dwg', '')}-View-\\d+").match, self.filenames))
             for view_name in view_names_on_sheet:
-                sheet_branch.add(f" [yellow]{view_name.replace('.dwg', '')}[/yellow]")
+                view_number= re.search(f"{sheet_name.replace(".dwg",'')}-View-(.+).dwg",view_name).group(1)
+                view_branch = sheet_branch.add(f" [sky_blue2]{view_name}[/sky_blue2]")
+                regggex = f"{sheet_name.replace(".dwg",'')}-.+-rvt-{(view_number)}.+.dwg" 
+                xrefs_in_view= list(filter(re.compile(regggex).match, self.filenames))
+                for xref in xrefs_in_view:
+                    view_branch.add(f" [blue]{xref}[/blue]")
+
         console.print(tree)
 
     def process_sheets(self):
