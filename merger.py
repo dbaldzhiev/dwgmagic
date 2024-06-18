@@ -6,7 +6,7 @@ import multiprocessing as mp
 from threading import Thread
 
 from rich.console import Console
-from rich.progress import Progress, track
+from rich.progress import Progress, TaskID
 from rich.tree import Tree
 
 import config as cfg
@@ -66,15 +66,19 @@ class Project:
         console.print(tree)
 
     def process_sheets(self):
+        results = []
         if cfg.sheetThreading:
             try:
-                with mp.Pool(mp.cpu_count()) as pool:
-                    return pool.map(Sheet, [(s, self) for s in self.sheetNamesList])
+                with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
+                    task = progress.add_task("Processing Sheets", total=len(self.sheetNamesList))
+                    for sheet in pool.imap_unordered(Sheet, [(s, self) for s in self.sheetNamesList]):
+                        results.append(sheet)
+                        progress.advance(task)
             except Exception as e:
                 console.print(f"Error processing sheets: {str(e)}", style="bold red")
-                return []
         else:
-            return [Sheet((s, self)) for s in self.sheetNamesList]
+            results = [Sheet((s, self)) for s in self.sheetNamesList]
+        return results
 
     def generate_scripts(self):
         sg.generate_project_script(self.sheetNamesList, self.xrefXplodeToggle, self.sheets, log_dir=self.log_dir)
@@ -116,7 +120,7 @@ class Project:
         executed_commands = 0
 
         with Progress() as progress:
-            task = progress.add_task("Processing", total=total_commands)
+            task = progress.add_task("Processing the Merge", total=total_commands)
 
             while True:
                 output = process.stdout.readline()
@@ -155,19 +159,28 @@ class Sheet:
         views = []
         try:
             if cfg.viewThreading:
-                threads = []
-                for view in self.viewNamesOnSheetList:
-                    thread = Thread(target=lambda v: views.append(View((v, project))), args=(view,))
-                    thread.start()
-                    threads.append(thread)
-                for thread in threads:
-                    thread.join()
+                with Progress() as progress:
+                    task: TaskID = progress.add_task(f"Processing Views for Sheet {self.sheetName}", total=len(self.viewNamesOnSheetList))
+                    threads = []
+                    for view in self.viewNamesOnSheetList:
+                        thread = Thread(target=self.process_view, args=(view, project, views, progress, task))
+                        thread.start()
+                        threads.append(thread)
+                    for thread in threads:
+                        thread.join()
             else:
-                for view in track(self.viewNamesOnSheetList, description=f"Processing Views for Sheet {self.sheetName}"):
-                    views.append(View((view, project)))
+                with Progress() as progress:
+                    task: TaskID = progress.add_task(f"Processing Views for Sheet {self.sheetName}", total=len(self.viewNamesOnSheetList))
+                    for view in self.viewNamesOnSheetList:
+                        views.append(View((view, project)))
+                        progress.advance(task)
         except Exception as e:
             console.print(f"Error processing views for sheet {self.sheetName}: {str(e)}", style="bold red")
         return views
+
+    def process_view(self, view, project, views, progress, task):
+        views.append(View((view, project)))
+        progress.advance(task)
 
     def run_Sheet_cleaner(self):
         slg = lg.setup_logger(f"SHEET_{self.sheetName}")
@@ -188,7 +201,7 @@ class Sheet:
                 os.remove(f"{os.getcwd()}/derevitized/{self.workingFile}")
             except Exception as e:
                 slg.error(f"Failed to remove file {self.workingFile}: {str(e)}")
-
+                
 class View:
     def __init__(self, args):
         vn, project = args
@@ -217,3 +230,9 @@ class View:
         output, err = run_command(command, log=vlg, verbose=cfg.verbose)
         if output is None:
             vlg.error(f"Failed to clean view {self.viewName}: {str(err)}")
+
+# Continue with any remaining code in merger.py, if there is any
+
+if __name__ == "__main__":
+    # The main script execution logic can go here
+    pass
