@@ -31,7 +31,7 @@ def log_and_print(message, log=None, style=None):
     if cfg.verbose:
         console.print(message, style=style)
 
-def process_view(view, acc_path, log_dir):
+def view_worker(view, acc_path, log_dir):
     view_name = view.replace(".dwg", "")
     view_cleaner_script = f"{view_name.upper()}.scr"
     sg.generate_view_script(view_name, view_cleaner_script, log_dir=log_dir)
@@ -49,7 +49,7 @@ def process_view(view, acc_path, log_dir):
     if output is None:
         view_logger.error(f"Failed to clean view {view_name}: {str(err)}")
 
-def process_sheet(sheet, acc_path, log_dir, files):
+def sheet_worker(sheet, acc_path, log_dir, files):
     sheet_name = sheet.replace(".dwg", "")
     views_on_sheet = list(filter(re.compile(f"{sheet_name}-View-\\d+").match, files))
     sheet_cleaner_script = f"{sheet_name.upper()}_SHEET.scr"
@@ -78,7 +78,7 @@ class Project:
         self.log_dir = log_dir
         self.project_name = os.path.basename(os.getcwd())
         self.setup_environment()
-        self.display_hierarchy()
+        #self.display_hierarchy()
         self.generate_scripts()
         self.process_views()
         self.process_sheets()
@@ -87,41 +87,47 @@ class Project:
     def setup_environment(self):
         self.files = os.listdir(f"{os.getcwd()}/derevitized/")
         self.acc_path = checks.acc_version()
-        self.sheets = sorted(
-            [fname for fname in self.files if re.match(r"(?!(?:.*-View-\d*)|(?:.*-rvt-))(^.*)(?:\.dwg$)", fname)]
-        )
-        self.view_files = [view for view in self.files if re.match(r".*-View-\d+\.dwg$", view)]
+        self.sheet = sorted([sheet for sheet in self.files if re.match(r"(?!(?:.*-View-\d*)|(?:.*-rvt-))(^.*)(?:\.dwg$)", sheet)])
+        self.view = [view for view in self.files if re.match(r".*-View-\d+\.dwg$", view)]
         self.xref_xplode_toggle = True
 
     def display_hierarchy(self):
         tree = Tree(f" [bold orange1]{self.project_name}[/bold orange1]", guide_style="bold orange1")
-        for sheet in self.sheets:
+        for sheet in self.sheet:
             sheet_branch = tree.add(f" [wheat1]{sheet}[/wheat1]")
             views_on_sheet = list(filter(re.compile(f"{sheet.replace('.dwg', '')}-View-\\d+").match, self.files))
             for view in views_on_sheet:
-                view_number = re.search(f"{sheet.replace('.dwg','')}-View-(.+).dwg", view).group(1)
                 view_branch = sheet_branch.add(f" [sky_blue2]{view}[/sky_blue2]")
+                view_number = re.search(f"{sheet.replace('.dwg','')}-View-(.+).dwg", view).group(1)
                 xrefs_in_view = list(filter(re.compile(f"{sheet.replace('.dwg','')}-.*-rvt-{view_number}.*.dwg").match, self.files))
                 for xref in xrefs_in_view:
                     view_branch.add(f" [blue]{xref}[/blue]")
         console.print(tree)
 
     def generate_scripts(self):
-        sg.generate_project_script(self.sheets, self.xref_xplode_toggle, [], log_dir=self.log_dir)
+        sg.generate_project_script(self.sheet, self.xref_xplode_toggle, [], log_dir=self.log_dir)
         sg.generate_manual_master_merge_script(self.xref_xplode_toggle, [], log_dir=self.log_dir)
         sg.generate_manual_master_merge_bat(self.acc_path, log_dir=self.log_dir)
 
     def process_views(self):
         with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
-            task = progress.add_task("Processing Views", total=len(self.view_files))
-            pool.starmap(process_view, [(view, self.acc_path, self.log_dir) for view in self.view_files])
-            progress.update(task, advance=len(self.view_files))
+            task = progress.add_task("Processing Views", total=len(self.view))
+            def update_progress(result):
+                progress.update(task, advance=1)
+            for view in self.view:
+                pool.apply_async(view_worker, args=(view, self.acc_path, self.log_dir), callback=update_progress)
+            pool.close()
+            pool.join()
 
     def process_sheets(self):
         with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
-            task = progress.add_task("Processing Sheets", total=len(self.sheets))
-            pool.starmap(process_sheet, [(sheet, self.acc_path, self.log_dir, self.files) for sheet in self.sheets])
-            progress.update(task, advance=len(self.sheets))
+            task = progress.add_task("Processing Sheets", total=len(self.sheet))
+            def update_progress(result):
+                progress.update(task, advance=1)
+            for sheet in self.sheet:
+                pool.apply_async(sheet_worker, args=(sheet, self.acc_path, self.log_dir, self.files), callback=update_progress)
+            pool.close()
+            pool.join()
 
     def merge_results(self):
         main_logger = lg.setup_logger("MAIN_MERGER", log_dir=self.log_dir)
