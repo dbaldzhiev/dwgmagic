@@ -1,39 +1,37 @@
+# main.py
 import os
-import sys
+import argparse
 import merger as m
 import miscutil as mu
 import checks
+import config as cfg
 
 def display_title_bar():
-    # Clears the terminal screen, and displays a title bar.
+    title_bar = """
+    ╭──────────────────────────────────────────────╮
+    │                   DWGMAGIC                   │
+    ├──────────────────────────────────────────────┤
+    │        TECTONICA - Dimitar Baldzhiev         │
+    ╰──────────────────────────────────────────────╯
+    """
+    print(title_bar)
 
-    print("\t  ╭──────────────────────────────────────────────╮")
-    print("\t  │        🪄  DWGMAGIC IS STARTING  🏰          │")
-    print("\t  ├──────────────────────────────────────────────┤")
-    print("\t  │        TECTONICA - Dimitar Baldzhiev         │")
-    print("\t  ╰──────────────────────────────────────────────╯")
+def parse_args():
+    parser = argparse.ArgumentParser(description="DWGMAGIC Toolset")
+    parser.add_argument("path", help="Path to the project directory")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    return parser.parse_args()
 
-
-def main(path):
-
-    # Display the title bar.
+def main(path, verbose):
+    cfg.verbose = verbose
+    log_dir = os.path.join(path, "logs")
+    mu.cleanup_old_logs(log_dir)
     display_title_bar()
-    checks.checks()     
-
-    # Change the current working directory.
     os.chdir(path)
-
-    # Preprocess the file.
-    mu.preprocess()
-
-    # Run the project.
-    m.Project()
+    mu.preprocess(log_dir=log_dir)
+    checks.checks(log_dir=log_dir)
+    m.Project(log_dir=log_dir)
 
 if __name__ == "__main__":
-    try:
-        # Print the path to be processed.
-        print("+++++ TARGET PROJECT: {}".format(sys.argv[1]))
-    except:
-        sys.exit("ERROR! No path provided!")
-    main(sys.argv[1])
-
+    args = parse_args()
+    main(args.path, args.verbose)

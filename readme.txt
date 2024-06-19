@@ -1,38 +1,60 @@
-=====TECTONICA=======
+DWGMAGIC v3.00
+Overview
+DWGMAGIC is a tool designed to automate the process of combining sheets exported from Autodesk Revit into a single DWG file. This script is particularly useful in workflows where delivering all project sheets in modelspace is required, even though this approach is considered outdated. DWGMAGIC arranges the exported sheets in modelspace, XREFs all the DWGs, binds them, and cleans up the resulting file.
 
-======DWGMAGIC=======
-=====version 0.5=====
-by Dimitar Baldzhiev
-Overview:
+How It Works
+The script operates in several steps:
 
-This script is designed to automatically combine sheets exported from Autodesk Revit into a single DWG file. It is intended for situations where the practice requires delivering all sheets of a project in modelspace, despite it being an obsolete workflow. The script takes exported sheets from Revit, arranges them in modelspace, XREFs all the DWGs, binds them, and cleans up the resulting file.
+Export Sheets from Revit: Export sheets with the "Export views on sheets and links as external references" option enabled and use the "Automatic-Short" naming convention. The sheets should be sequentially numbered (1, 2, 3, etc.) and saved to an empty directory.
+Run DWGMAGIC: Execute the script with the command python main.py TARGETDIR, where TARGETDIR is the path to the directory containing the exported sheets.
+Script Execution: DWGMAGIC generates several .SCR files, which are executed using accoreconsole.exe, the command-line version of AutoCAD.
+Processing: The script processes the DWG files, organizes them, and outputs:
 
-Procedure:
-
-Export sheets from Revit with the "Export views on sheets and links as external references" option enabled, and select the "Automatic-Short" naming convention. The sheets should be numbered 1, 2, 3, 4, etc. and saved to an empty directory.
-
-Execute the script with the command "python dwgmagic.py TARGETDIR" where "TARGETDIR" is the path to the directory where the exported sheets are located.
-
-The script generates several .SCR files that are automatically executed with accoreconsole.exe, a command-line version of AutoCAD.
-
-The script loads the tectonica.dll, which handles renaming the XREFs, reordering multiviewport sheets, and arranging the sheets neatly. Make sure to set up the tectonica.dll properly.
-
-Once the script is complete, the target folder will contain the following:
-
-/derevitized: All the DWG files as modified by the script.
+/derevitized: Modified DWG files.
 /originals: Unchanged original exported DWG files.
-/scripts: The .SCR files that were generated and executed by accoreconsole.
-acclog.log: A log file that may or may not contain everything.
-MasterXref.dwg: A DWG file with all the sheets XREFed into it.
-MasterMerged.dwg: A DWG file with all the sheets bound and exploded "smartly".
-Contributions:
+/scripts: Generated and executed .SCR files.
+acclog.log: Log file.
+MasterXref.dwg: DWG file with all sheets XREFed into it.
+MasterMerged.dwg: DWG file with all sheets bound and exploded.
 
-This script was written by the original author and may have some bugs. The author welcomes contributions and suggestions for improvement. If you are interested in using the script or contributing code, please express your interest and contribute to the project.
+Requirements
+Python installed on your system.
+AutoCAD installed with versions from 2017 to 2026.
+Dependencies listed in requirements.txt:
+Jinja2==3.1.4
+rich==13.7.1
 
+Installation
+Install Python: Ensure Python is installed on your system.
+Install Dependencies: Run the install_py-req.bat batch file to install the required Python packages.
+Run the Registry File: Execute the DWGMAGIC.reg file to add DWGMAGIC to the context menu.
+Configure AutoCAD: Add the dwgmagic2 folder to trusted folders in AutoCAD.
+Start Merging: Run the script with your target directory as described above.
+Configuration
+Configuration settings are specified in config.py:
 
-How to install: 
-1. Install Python
-2. run install_py-req.bat
-3. run DWGMAGIC.reg
-4. add dwgmagic2 folder to trusted folders in Autocad
-5. start merging :)
+DMM_PATH: Default path for the DWGMAGIC tool.
+accpathv: Dictionary specifying paths to accoreconsole.exe for AutoCAD versions from 2017 to 2026.
+verbose: Flag for enabling verbose output.
+xref_xplode_toggle: Toggle for XREF explode option.
+log_encoding: Encoding for log files.
+log_level: Log level setting.
+
+Adding DWGMAGIC to the Context Menu
+To add DWGMAGIC as a context menu item, follow these steps:
+Run DWGMAGIC.reg: Execute the DWGMAGIC.reg file. This will modify your Windows registry to include DWGMAGIC in the context menu for folders.
+Context Menu Usage: Right-click on any folder and select DWGMAGIC from the context menu to execute the script for that directory.
+
+Usage
+Run the script with the following command:
+
+python main.py <path_to_directory>
+Example:
+
+python main.py C:/Projects/ExportedSheets
+This command will process all the DWG files in the C:/Projects/ExportedSheets directory according to the DWGMAGIC workflow.
+
+Contributions
+This script was originally developed by Dimitar Baldzhiev. Contributions and suggestions for improvement are welcome. If you encounter any bugs or have ideas for enhancements, please contribute to the project.
+
+This readme covers the essential aspects of DWGMAGIC v3.00, including its functionality, requirements, installation steps, configuration, and usage instructions. Enjoy using DWGMAGIC for efficient DWG file management!

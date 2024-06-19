@@ -1,17 +1,18 @@
+# logger.py
 import logging
+import os
+from config import log_encoding, log_level
 
-
-
-def newLog(name):
-    # Create logger
+def setup_logger(name, log_dir="logs"):
+    os.makedirs(log_dir, exist_ok=True)
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
-    # Create file handler for logger
-    file_handler = logging.FileHandler('logs/{0}.log'.format(name),encoding='utf-16-le')
-    file_handler.setLevel(logging.DEBUG)
-    # Create formatter and add it to the handler
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    # Add the handler to the logger
-    logger.addHandler(file_handler)
+    logger.setLevel(getattr(logging, log_level))
+    
+    if not logger.hasHandlers():
+        file_handler = logging.FileHandler(os.path.join(log_dir, f"{name}.log"), encoding=log_encoding)
+        file_handler.setLevel(getattr(logging, log_level))
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    
     return logger
