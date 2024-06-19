@@ -111,7 +111,7 @@ class Project:
 
     def process_views(self):
         with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
-            task = progress.add_task("Processing Views", total=len(self.view))
+            task = progress.add_task("Processing Views    ", total=len(self.view))
             def update_progress(result):
                 progress.update(task, advance=1)
             for view in self.view:
@@ -121,7 +121,7 @@ class Project:
 
     def process_sheets(self):
         with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
-            task = progress.add_task("Processing Sheets", total=len(self.sheet))
+            task = progress.add_task("Processing Sheets   ", total=len(self.sheet))
             def update_progress(result):
                 progress.update(task, advance=1)
             for sheet in self.sheet:
