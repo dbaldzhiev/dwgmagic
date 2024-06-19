@@ -9,10 +9,7 @@ accpathv = {str(year): f"C:/Program Files/Autodesk/AutoCAD {year}/accoreconsole.
 
 # Flags and Parameters
 verbose = False
-xrefXplodeToggle = False
-deadline = 120
-sheetThreading = True
-viewThreading = False
+xref_xplode_toggle = True
 
 # Logging Configuration
 log_encoding = "utf-16-le"

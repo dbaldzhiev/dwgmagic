@@ -89,7 +89,7 @@ class Project:
         self.acc_path = checks.acc_version()
         self.sheet = sorted([sheet for sheet in self.files if re.match(r"(?!(?:.*-View-\d*)|(?:.*-rvt-))(^.*)(?:\.dwg$)", sheet)])
         self.view = [view for view in self.files if re.match(r".*-View-\d+\.dwg$", view)]
-        self.xref_xplode_toggle = True
+    
 
     def display_hierarchy(self):
         tree = Tree(f" [bold orange1]{self.project_name}[/bold orange1]", guide_style="bold orange1")
@@ -105,8 +105,8 @@ class Project:
         console.print(tree)
 
     def generate_scripts(self):
-        sg.generate_project_script(self.sheet, self.xref_xplode_toggle, [], log_dir=self.log_dir)
-        sg.generate_manual_master_merge_script(self.xref_xplode_toggle, [], log_dir=self.log_dir)
+        sg.generate_project_script(self.sheet, cfg.xref_xplode_toggle, [], log_dir=self.log_dir)
+        sg.generate_manual_master_merge_script(cfg.xref_xplode_toggle, [], log_dir=self.log_dir)
         sg.generate_manual_master_merge_bat(self.acc_path, log_dir=self.log_dir)
 
     def process_views(self):
@@ -154,7 +154,7 @@ class Project:
                 if output == '' and process.poll() is not None:
                     break
                 if output and len(commands)>0:
-                    match = re.compile(commands[0].split()[0]).search(output.strip())
+                    match = re.compile(re.escape(commands[0].split()[0])).search(output.strip())
                     if match:
                         del commands[0]
                         progress.update(task, advance=1)
