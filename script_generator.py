@@ -45,14 +45,14 @@ def generate_manual_master_merge_bat(accpath, log_dir=None):
                     acc=accpath,
                     project_name=os.path.basename(os.getcwd()))
 
-def generate_sheet_script(sheet_name, views_on_sheet, log_dir=None):
+def generate_sheet_script(sheet_name, views_on_sheet,sheet_cleaner_script, log_dir=None):
     logger = setup_script_logger(log_dir)
-    generate_script('sheet_script_template.tmpl', f'./scripts/{sheet_name.upper()}_SHEET.scr', logger,
+    generate_script('sheet_script_template.tmpl', f'./scripts/{sheet_cleaner_script}', logger,
                     viewsOnSheet=views_on_sheet,
                     tectonica_path=cfg.DMM_PATH,
                     sheetName=sheet_name)
 
-def generate_view_script(view_name, log_dir=None):
+def generate_view_script(view_name,view_cleaner_script, log_dir=None):
     logger = setup_script_logger(log_dir)
-    generate_script('view_script_template.tmpl', f'./scripts/{view_name.upper()}.scr', logger,
+    generate_script('view_script_template.tmpl', f'./scripts/{view_cleaner_script}', logger,
                     viewName=view_name)
