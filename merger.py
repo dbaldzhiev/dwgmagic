@@ -141,11 +141,10 @@ class Project:
         with open("./scripts/DWGMAGIC.scr", "r") as file:
             script_lines = file.readlines()
 
-        total_commands = sum(1 for line in script_lines if line.strip())
-
+        commands = [line for line in script_lines if line.strip()]
+        total_commands = len(commands)
         process = sp.Popen(command, stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
-        command_pattern = re.compile(r'^Command: (.+)$')
-        executed_commands = 0
+
 
         with Progress() as progress:
             task = progress.add_task("Processing the Merge", total=total_commands)
@@ -154,10 +153,10 @@ class Project:
                 log_and_print(f"{output.strip()}", main_logger, style="bold yellow")
                 if output == '' and process.poll() is not None:
                     break
-                if output:
-                    match = command_pattern.match(output.strip())
+                if output and len(commands)>0:
+                    match = re.compile(commands[0].split()[0]).search(output.strip())
                     if match:
-                        executed_commands += 1
+                        del commands[0]
                         progress.update(task, advance=1)
             progress.update(task, completed=total_commands)
 
