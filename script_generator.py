@@ -24,7 +24,7 @@ def generate_script(template_name, output_path, logger, **context):
 
 def generate_project_script(sheet_names_list, xref_xplode_toggle, sheets, log_dir=None):
     logger = setup_script_logger(log_dir)
-    generate_script('project_script_template.tmpl', './scripts/DWGMAGIC.scr', logger,
+    generate_script('./templates/project_script_template.tmpl', './scripts/DWGMAGIC.scr', logger,
                     sheetNamesList=sheet_names_list,
                     tectonica_path=cfg.DMM_PATH,
                     project_name=os.path.basename(os.getcwd()),
@@ -33,7 +33,7 @@ def generate_project_script(sheet_names_list, xref_xplode_toggle, sheets, log_di
 
 def generate_manual_master_merge_script(xref_xplode_toggle, sheets, log_dir=None):
     logger = setup_script_logger(log_dir)
-    generate_script('mmm_script_template.tmpl', './scripts/MMM.scr', logger,
+    generate_script('./templates/mmm_script_template.tmpl', './scripts/MMM.scr', logger,
                     tectonica_path=cfg.DMM_PATH,
                     xrefXplodeToggle=xref_xplode_toggle,
                     sheets=sheets,
@@ -41,18 +41,18 @@ def generate_manual_master_merge_script(xref_xplode_toggle, sheets, log_dir=None
 
 def generate_manual_master_merge_bat(accpath, log_dir=None):
     logger = setup_script_logger(log_dir)
-    generate_script('manual_merge_bat_template.tmpl', './MANUALMERGE.bat', logger,
+    generate_script('./templates/manual_merge_bat_template.tmpl', './MANUALMERGE.bat', logger,
                     acc=accpath,
                     project_name=os.path.basename(os.getcwd()))
 
 def generate_sheet_script(sheet_name, views_on_sheet,sheet_cleaner_script, log_dir=None):
     logger = setup_script_logger(log_dir)
-    generate_script('sheet_script_template.tmpl', f'./scripts/{sheet_cleaner_script}', logger,
+    generate_script('./templates/sheet_script_template.tmpl', f'./scripts/{sheet_cleaner_script}', logger,
                     viewsOnSheet=views_on_sheet,
                     tectonica_path=cfg.DMM_PATH,
                     sheetName=sheet_name)
 
 def generate_view_script(view_name,view_cleaner_script, log_dir=None):
     logger = setup_script_logger(log_dir)
-    generate_script('view_script_template.tmpl', f'./scripts/{view_cleaner_script}', logger,
+    generate_script('./templates/view_script_template.tmpl', f'./scripts/{view_cleaner_script}', logger,
                     viewName=view_name)
