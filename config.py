@@ -2,7 +2,7 @@
 import os
 
 # Single path configuration
-DMM_PATH = os.getenv("DMM_PATH", "C:/dwgmagic2")
+DMM_PATH = os.getenv("DMM_PATH", "C:/dwgmagic")
 
 # AutoCAD Paths
 accpathv = {str(year): f"C:/Program Files/Autodesk/AutoCAD {year}/accoreconsole.exe" for year in range(2017, 2026)}

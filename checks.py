@@ -25,7 +25,7 @@ def checks(log_dir=None):
     process = sp.Popen(shlex.split(command), stdout=sp.PIPE, shell=True, encoding='utf-16-le', errors='replace')
     output, _ = process.communicate()
 
-    if "Unable to load C:\\dwgmagic2\\tectonica.dll assembly." in output:
+    if "Unable to load C:\\dwgmagic\\tectonica.dll assembly." in output:
         sys.exit("TRUSTED FOLDER IS NOT SET UP")
 
     logger.info("Trusted folder check complete")
