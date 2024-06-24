@@ -50,21 +50,13 @@ def create_directory(path):
             else:
                 print(f"Failed to create {path}: {exc}")
 
-def cleanup_old_logs(log_dir):
-    if os.path.exists(log_dir):
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        new_log_dir = f"{log_dir}_backup_{timestamp}"
-        os.rename(log_dir, new_log_dir)
-    create_directory(log_dir)
-
-def preprocess(log_dir="logs"):
+def preprocess():
     global logger
-    logger = setup_logger("MISC_UTIL", log_dir=log_dir)
-    logger.info("Starting preprocessing")
     base_path = os.getcwd()
     remove_previous_preprocess(base_path)
+    logger = setup_logger("MISC_UTIL")
+    logger.info("Starting preprocessing")
     dwg_files = get_dwg_files_in_directory(base_path)
-    
     for folder in ["scripts", "originals", "derevitized", "logs"]:
         create_directory(os.path.join(base_path, folder))
     

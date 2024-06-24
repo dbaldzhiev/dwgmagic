@@ -24,13 +24,11 @@ def parse_args():
 
 def main(path, verbose):
     cfg.verbose = verbose
-    log_dir = os.path.join(path, "logs")
-    mu.cleanup_old_logs(log_dir)
-    display_title_bar()
     os.chdir(path)
-    mu.preprocess(log_dir=log_dir)
-    checks.checks(log_dir=log_dir)
-    m.Project(log_dir=log_dir)
+    display_title_bar()
+    checks.checks()
+    mu.preprocess()
+    m.Project()
 
 if __name__ == "__main__":
     args = parse_args()
