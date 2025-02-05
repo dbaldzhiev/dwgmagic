@@ -12,5 +12,6 @@ verbose = False
 xref_xplode_toggle = True
 
 # Logging Configuration
-log_encoding = "utf-16-le"
+#log_encoding = "utf-16-le"
+log_encoding = "utf-8"
 log_level = "DEBUG"
