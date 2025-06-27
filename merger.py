@@ -138,7 +138,7 @@ class Project:
         ]
         log_and_print(f"Running Command: {' '.join(command)}", main_logger, style="bold yellow")
 
-        with open("./scripts/DWGMAGIC.scr", "r") as file:
+        with open("./scripts/DWGMAGIC.scr", "r", encoding="utf-8") as file:
             script_lines = file.readlines()
 
         commands = [line for line in script_lines if line.strip()]
