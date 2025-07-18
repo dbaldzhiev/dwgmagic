@@ -50,6 +50,12 @@ def create_directory(path):
             else:
                 print(f"Failed to create {path}: {exc}")
 
+def cleanup_old_logs(log_dir):
+    if os.path.exists(log_dir):
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        os.rename(log_dir, f"{log_dir}_backup_{timestamp}")
+    create_directory(log_dir)
+
 def preprocess():
     global logger
     base_path = os.getcwd()
