@@ -49,10 +49,21 @@ Usage
 Run the script with the following command:
 
 python main.py <path_to_directory>
+You can optionally specify a log directory:
+
+python main.py <path_to_directory> --log-dir my_logs
 Example:
 
 python main.py C:/Projects/ExportedSheets
 This command will process all the DWG files in the C:/Projects/ExportedSheets directory according to the DWGMAGIC workflow.
+
+Launching the GUI
+-----------------
+You can start a simple graphical interface with:
+
+python main.py --gui
+
+From the GUI you can select the project directory and run the tool without manually typing commands. The interface also lets you choose a log directory and displays the contents of the log once the run finishes.
 
 Contributions
 This script was originally developed by Dimitar Baldzhiev. Contributions and suggestions for improvement are welcome. If you encounter any bugs or have ideas for enhancements, please contribute to the project.

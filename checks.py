@@ -11,8 +11,8 @@ def acc_version():
             return path
     sys.exit('Cannot find accoreconsole.exe')
 
-def checks():
-    logger = setup_logger("CHECKS")
+def checks(log_dir="logs"):
+    logger = setup_logger("CHECKS", log_dir=log_dir)
 
     acc_path = acc_version()
     command = f"\"{acc_path}\" /s \"{cfg.DMM_PATH}/trustedFolderCheck.scr\""
