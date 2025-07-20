@@ -33,8 +33,8 @@ class TestChecks(unittest.TestCase):
         mock_popen.return_value = process_mock
 
         # First run, no error in output
-        ck.checks(log_dir="logs")
-        mock_setup_logger.assert_called_with("CHECKS", log_dir="logs")
+        ck.checks()
+        mock_setup_logger.assert_called_with("CHECKS")
         mock_logger.info.assert_any_call("ACCORECONSOLE PATH: %s", "/path/to/acc")
         mock_popen.assert_called()
         mock_exit.assert_not_called()
@@ -42,7 +42,7 @@ class TestChecks(unittest.TestCase):
         # Second run, error in output
         process_mock.communicate.return_value = ("Unable to load C:\\dwgmagic\\tectonica.dll assembly.", None)
         try:
-            ck.checks(log_dir="logs")
+            ck.checks()
         except SystemExit:
             pass  # Expected exit
 
