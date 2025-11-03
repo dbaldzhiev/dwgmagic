@@ -54,19 +54,46 @@ def cleanup_old_logs(log_dir):
     """Rename existing log directory and create a fresh one."""
     if os.path.exists(log_dir):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        os.rename(log_dir, f"{log_dir}_backup_{timestamp}")
+        backup_dir = f"{log_dir}_backup_{timestamp}"
+        try:
+            os.rename(log_dir, backup_dir)
+        except OSError as exc:
+            message = (
+                f"Failed to archive existing logs at {log_dir}: {exc}. "
+                "Attempting to clear accessible log files in place."
+            )
+            if logger:
+                logger.warning(message)
+            else:
+                print(message)
+
+            for entry in os.listdir(log_dir):
+                entry_path = os.path.join(log_dir, entry)
+                if os.path.isdir(entry_path):
+                    safe_remove(entry_path)
+                else:
+                    try:
+                        os.remove(entry_path)
+                    except Exception as remove_exc:
+                        if logger:
+                            logger.error("Unable to remove %s: %s", entry_path, remove_exc)
+                        else:
+                            print(f"Unable to remove {entry_path}: {remove_exc}")
+        else:
+            create_directory(log_dir)
+            return
     create_directory(log_dir)
 
 def preprocess():
     global logger
     base_path = os.getcwd()
     remove_previous_preprocess(base_path)
+    cleanup_old_logs(os.path.join(base_path, "logs"))
     logger = setup_logger("MISC_UTIL")
     logger.info("Starting preprocessing")
     dwg_files = get_dwg_files_in_directory(base_path)
     for folder in ["scripts", "originals", "derevitized"]:
         create_directory(os.path.join(base_path, folder))
-    cleanup_old_logs(os.path.join(base_path, "logs"))
     
     logger.info("COPYING %d FILES", len(dwg_files))
     for file_name in dwg_files:
