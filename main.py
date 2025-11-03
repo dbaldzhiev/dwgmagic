@@ -1,20 +1,20 @@
 # main.py
 import os
 import argparse
+from rich.console import Console
 import merger as m
 import miscutil as mu
 import checks
 import config as cfg
 
+console = Console()
+
 def display_title_bar():
-    title_bar = """
-    ╭──────────────────────────────────────────────╮
-    │                   DWGMAGIC                   │
-    ├──────────────────────────────────────────────┤
-    │        TECTONICA - Dimitar Baldzhiev         │
-    ╰──────────────────────────────────────────────╯
-    """
-    print(title_bar)
+    console.print("╭──────────────────────────────────────────────╮", style="cyan")
+    console.print("│                   [bold magenta]DWGMAGIC[/bold magenta]                   │")
+    console.print("├──────────────────────────────────────────────┤", style="cyan")
+    console.print("│        [italic]TECTONICA - Dimitar Baldzhiev[/italic]         │")
+    console.print("╰──────────────────────────────────────────────╯", style="cyan")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="DWGMAGIC Toolset")

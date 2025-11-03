@@ -37,9 +37,9 @@ class TestMerger(unittest.TestCase):
         mock_setup_logger.return_value = mock_logger
         mock_run_command.return_value = ("output", None)
         
-        merger.view_worker("test.dwg", "/path/to/acc", "/path/to/logs")
-        mock_generate_view_script.assert_called_with("test", "TEST.scr", log_dir="/path/to/logs")
-        mock_setup_logger.assert_called_with("TEST", log_dir="/path/to/logs")
+        merger.view_worker("test.dwg", "/path/to/acc")
+        mock_generate_view_script.assert_called_with("test", "TEST.scr")
+        mock_setup_logger.assert_called_with("TEST")
         mock_run_command.assert_called()
         
     @patch('merger.sg.generate_sheet_script')
@@ -51,9 +51,9 @@ class TestMerger(unittest.TestCase):
         mock_setup_logger.return_value = mock_logger
         mock_run_command.return_value = ("output", None)
         
-        merger.sheet_worker("test.dwg", "/path/to/acc", "/path/to/logs", ["test-View-1.dwg"])
-        mock_generate_sheet_script.assert_called_with("test", ["test-View-1.dwg"], "TEST_SHEET.scr", log_dir="/path/to/logs")
-        mock_setup_logger.assert_called_with("SHEET_test", log_dir="/path/to/logs")
+        merger.sheet_worker("test.dwg", "/path/to/acc", ["test-View-1.dwg"])
+        mock_generate_sheet_script.assert_called_with("test", ["test-View-1.dwg"], "TEST_SHEET.scr")
+        mock_setup_logger.assert_called_with("SHEET_test")
         mock_run_command.assert_called()
         mock_remove.assert_called_with(f"{os.getcwd()}/derevitized/test.dwg")
 

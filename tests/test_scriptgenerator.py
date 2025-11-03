@@ -17,13 +17,13 @@ class TestScriptGenerator(unittest.TestCase):
 
         with patch('builtins.open', mock_open()) as mocked_file:
             sg.generate_script('template.tmpl', '/path/to/output', logger, context_key='value')
-            mocked_file.assert_called_with('/path/to/output', 'w')
+            mocked_file.assert_called_with('/path/to/output', 'w', encoding='utf-8')
             mocked_file().write.assert_called_with('rendered content')
             logger.info.assert_called_with("Generated script %s", '/path/to/output')
 
     @patch('script_generator.generate_script')
     def test_generate_project_script(self, mock_generate_script):
-        sg.generate_project_script(['sheet1', 'sheet2'], True, ['sheet'], log_dir='logs')
+        sg.generate_project_script(['sheet1', 'sheet2'], True, ['sheet'])
         mock_generate_script.assert_called_with(
             './templates/project_script_template.tmpl', './scripts/DWGMAGIC.scr', 
             mock.ANY,
@@ -36,7 +36,7 @@ class TestScriptGenerator(unittest.TestCase):
 
     @patch('script_generator.generate_script')
     def test_generate_manual_master_merge_script(self, mock_generate_script):
-        sg.generate_manual_master_merge_script(True, ['sheet'], log_dir='logs')
+        sg.generate_manual_master_merge_script(True, ['sheet'])
         mock_generate_script.assert_called_with(
             './templates/mmm_script_template.tmpl', './scripts/MMM.scr', 
             mock.ANY,
@@ -48,7 +48,7 @@ class TestScriptGenerator(unittest.TestCase):
 
     @patch('script_generator.generate_script')
     def test_generate_manual_master_merge_bat(self, mock_generate_script):
-        sg.generate_manual_master_merge_bat('/path/to/acc', log_dir='logs')
+        sg.generate_manual_master_merge_bat('/path/to/acc')
         mock_generate_script.assert_called_with(
             './templates/manual_merge_bat_template.tmpl', './MANUALMERGE.bat', 
             mock.ANY,

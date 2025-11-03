@@ -31,12 +31,12 @@ def log_and_print(message, log=None, style=None):
     if cfg.verbose:
         console.print(message, style=style)
 
-def view_worker(view, acc_path, log_dir):
+def view_worker(view, acc_path):
     view_name = view.replace(".dwg", "")
     view_cleaner_script = f"{view_name.upper()}.scr"
-    sg.generate_view_script(view_name, view_cleaner_script, log_dir=log_dir)
+    sg.generate_view_script(view_name, view_cleaner_script)
 
-    view_logger = lg.setup_logger(f"{view_name.upper()}", log_dir=log_dir)
+    view_logger = lg.setup_logger(f"{view_name.upper()}")
     command = [
         acc_path,
         "/i",
@@ -49,13 +49,13 @@ def view_worker(view, acc_path, log_dir):
     if output is None:
         view_logger.error(f"Failed to clean view {view_name}: {str(err)}")
 
-def sheet_worker(sheet, acc_path, log_dir, files):
+def sheet_worker(sheet, acc_path, files):
     sheet_name = sheet.replace(".dwg", "")
     views_on_sheet = list(filter(re.compile(f"{sheet_name}-View-\\d+").match, files))
     sheet_cleaner_script = f"{sheet_name.upper()}_SHEET.scr"
-    sg.generate_sheet_script(sheet_name, views_on_sheet, sheet_cleaner_script, log_dir=log_dir)
+    sg.generate_sheet_script(sheet_name, views_on_sheet, sheet_cleaner_script)
 
-    sheet_logger = lg.setup_logger(f"SHEET_{sheet_name}", log_dir=log_dir)
+    sheet_logger = lg.setup_logger(f"SHEET_{sheet_name}")
     command = [
         acc_path,
         "/i",
@@ -74,8 +74,8 @@ def sheet_worker(sheet, acc_path, log_dir, files):
             sheet_logger.error(f"Failed to remove file {sheet}: {str(e)}")
 
 class Project:
-    def __init__(self, log_dir="logs"):
-        self.log_dir = log_dir
+    def __init__(self):
+        self.log_dir = os.path.join(os.getcwd(), "logs")
         self.project_name = os.path.basename(os.getcwd())
         self.setup_environment()
         #self.display_hierarchy()
@@ -105,9 +105,9 @@ class Project:
         console.print(tree)
 
     def generate_scripts(self):
-        sg.generate_project_script(self.sheet, cfg.xref_xplode_toggle, [], log_dir=self.log_dir)
-        sg.generate_manual_master_merge_script(cfg.xref_xplode_toggle, [], log_dir=self.log_dir)
-        sg.generate_manual_master_merge_bat(self.acc_path, log_dir=self.log_dir)
+        sg.generate_project_script(self.sheet, cfg.xref_xplode_toggle, [])
+        sg.generate_manual_master_merge_script(cfg.xref_xplode_toggle, [])
+        sg.generate_manual_master_merge_bat(self.acc_path)
 
     def process_views(self):
         with mp.Pool(mp.cpu_count()) as pool, Progress() as progress:
@@ -115,7 +115,7 @@ class Project:
             def update_progress(result):
                 progress.update(task, advance=1)
             for view in self.view:
-                pool.apply_async(view_worker, args=(view, self.acc_path, self.log_dir), callback=update_progress)
+                pool.apply_async(view_worker, args=(view, self.acc_path), callback=update_progress)
             pool.close()
             pool.join()
 
@@ -125,12 +125,12 @@ class Project:
             def update_progress(result):
                 progress.update(task, advance=1)
             for sheet in self.sheet:
-                pool.apply_async(sheet_worker, args=(sheet, self.acc_path, self.log_dir, self.files), callback=update_progress)
+                pool.apply_async(sheet_worker, args=(sheet, self.acc_path, self.files), callback=update_progress)
             pool.close()
             pool.join()
 
     def merge_results(self):
-        main_logger = lg.setup_logger("MAIN_MERGER", log_dir=self.log_dir)
+        main_logger = lg.setup_logger("MAIN_MERGER")
         command = [
             self.acc_path,
             "/s",
