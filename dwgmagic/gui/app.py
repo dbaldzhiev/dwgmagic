@@ -185,6 +185,14 @@ class GuiApplication:
         self.stage_table.grid(row=0, column=0, sticky=tk.NSEW)
         stage_scroll_y.configure(command=self.stage_table.yview)
 
+        button_frame = ttk.Frame(self.root)
+        button_frame.pack(fill=tk.X, padx=12, pady=(0, 10))
+        self.run_button = ttk.Button(
+            button_frame, text="Run Pipeline", command=self._start_pipeline
+        )
+        self.run_button.pack(side=tk.LEFT)
+        ttk.Button(button_frame, text="Close", command=self._on_close).pack(side=tk.RIGHT)
+
         paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 10))
 
@@ -284,12 +292,6 @@ class GuiApplication:
         log_frame.pack(fill=tk.BOTH, expand=True, padx=(6, 0), pady=(0, 10))
         self.log_widget = ScrolledText(log_frame, state=tk.DISABLED, wrap=tk.WORD)
         self.log_widget.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
-
-        button_frame = ttk.Frame(self.root)
-        button_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
-        self.run_button = ttk.Button(button_frame, text="Run Pipeline", command=self._start_pipeline)
-        self.run_button.pack(side=tk.LEFT)
-        ttk.Button(button_frame, text="Close", command=self._on_close).pack(side=tk.RIGHT)
 
         self._configure_status_tags(self.stage_table)
         self._configure_status_tags(self.task_tree)
