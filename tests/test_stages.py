@@ -71,6 +71,9 @@ def test_preprocessor_stage_reruns_from_originals(tmp_path):
     (scripts_dir / "old.scr").write_text("old")
     derevitized_file = tmp_path / "derevitized" / "rerun.dwg"
     derevitized_file.write_text("stale")
+    stale_root = tmp_path / "converted_output"
+    stale_root.mkdir()
+    (stale_root / "artifact.txt").write_text("old")
 
     rerun_context, rerun_settings = make_context(tmp_path)
     rerun_stage = PreprocessorStage(Preprocessor(), LoggerFactory(rerun_settings))
@@ -81,6 +84,8 @@ def test_preprocessor_stage_reruns_from_originals(tmp_path):
     assert (tmp_path / "originals" / "rerun.dwg").exists()
     assert (tmp_path / "derevitized" / "rerun.dwg").exists()
     assert not (scripts_dir / "old.scr").exists()
+    assert not stale_root.exists()
+    assert not (tmp_path / "rerun.dwg").exists()
 
 
 def test_script_generation_stage(tmp_path):

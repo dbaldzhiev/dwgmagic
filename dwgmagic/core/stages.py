@@ -69,7 +69,17 @@ class ScriptGenerationStage(PipelineStage):
         try:
             artifacts = self.generator.generate_all(context, logger)
             context.set("scripts", artifacts)
-            return StageResult(self.name, True, data=artifacts)
+            structured_sheets = context.get("structured_sheets", [])
+            sheet_views_lookup = context.get("sheet_views_lookup", {})
+            return StageResult(
+                self.name,
+                True,
+                data={
+                    "artifacts": artifacts,
+                    "sheets": structured_sheets,
+                    "sheet_views_lookup": sheet_views_lookup,
+                },
+            )
         except Exception as exc:  # pragma: no cover - thin wrapper
             logger.error("Script generation failed: %s", exc)
             return StageResult(self.name, False, str(exc))

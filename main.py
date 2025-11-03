@@ -58,7 +58,7 @@ def build_environment(settings: Settings) -> Environment:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="DWGMAGIC Toolset")
-    parser.add_argument("path", help="Path to the project directory")
+    parser.add_argument("path", nargs="?", help="Path to the project directory")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--config", type=Path, help="Optional configuration file", default=None)
     parser.add_argument(
@@ -83,7 +83,34 @@ def display_title_bar() -> None:
 
 def main() -> None:
     args = parse_args()
-    project_root = Path(args.path).resolve()
+    project_root = Path(args.path).resolve() if args.path else None
+
+    if args.gui:
+        from dwgmagic.gui.app import run_gui
+
+        def _load_settings(root: Path) -> Settings:
+            return load_settings(
+                root,
+                verbose=args.verbose,
+                config_file=args.config,
+                template_roots=args.template_roots,
+                autocad_path=args.autocad_path,
+            )
+
+        run_gui(
+            settings_loader=_load_settings,
+            environment_builder=build_environment,
+            runner_factory=lambda settings: AutoCadRunner(settings),
+            coordinator_factory=lambda runner: AutoCadCoordinator(runner),
+            logger_factory_builder=lambda settings: LoggerFactory(settings),
+            initial_project=project_root,
+        )
+        return
+
+    if project_root is None:
+        console.print("[red]Error:[/red] Path to the project directory is required.")
+        raise SystemExit(1)
+
     settings = load_settings(
         project_root,
         verbose=args.verbose,
@@ -96,18 +123,6 @@ def main() -> None:
     logger_factory = LoggerFactory(settings)
     runner = AutoCadRunner(settings)
     coordinator = AutoCadCoordinator(runner)
-
-    if args.gui:
-        from dwgmagic.gui.app import run_gui
-
-        run_gui(
-            settings=settings,
-            environment=environment,
-            runner=runner,
-            coordinator=coordinator,
-            base_logger_factory=logger_factory,
-        )
-        return
 
     display_title_bar()
 

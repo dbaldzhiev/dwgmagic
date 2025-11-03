@@ -39,6 +39,9 @@ class ScriptGenerator:
             ]
             structured_sheets.append({"sheetName": sheet_name, "viewsOnSheet": structured_views})
 
+        context.set("structured_sheets", structured_sheets)
+        context.set("sheet_views_lookup", sheet_views_lookup)
+
         artifacts: Dict[str, Path] = {}
         artifacts["project_script"] = self._render(
             "templates/project_script_template.tmpl",
