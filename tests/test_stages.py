@@ -93,16 +93,19 @@ def test_script_generation_stage(tmp_path):
                 "templates/mmm_script_template.tmpl": "merge",
                 "templates/manual_merge_bat_template.tmpl": "bat",
                 "templates/view_script_template.tmpl": "view {{ viewName }}",
-                "templates/sheet_script_template.tmpl": "sheet {{ sheetName }} {{ viewsOnSheet|length }}",
+                "templates/sheet_script_template.tmpl": "{% for view in viewsOnSheet %}xref path \"{{ view[:-4] }}\" \"./{{ view }}\"\n{% endfor %}",
             }
-        )
+        ),
+        trim_blocks=True,
+        lstrip_blocks=True,
     )
     context.environment = env
     stage = ScriptGenerationStage(ScriptGenerator(env), LoggerFactory(settings))
     result = stage.run(context)
     assert result.succeeded is True
     assert (tmp_path / "scripts" / "DWGMAGIC.scr").read_text(encoding="cp1251") == "1"
-    assert (tmp_path / "scripts" / "SHEETA_SHEET.scr").exists()
+    sheet_script = (tmp_path / "scripts" / "SHEETA_SHEET.scr").read_text(encoding="cp1251")
+    assert 'xref path "SheetA-View-1" "./SheetA-View-1.dwg"' in sheet_script
     assert (tmp_path / "scripts" / "SHEETA-VIEW-1.scr").exists()
 
 
