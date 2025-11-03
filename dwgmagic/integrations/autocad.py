@@ -67,6 +67,7 @@ class AutoCadRunner:
             encoding="utf-16-le",
             timeout=self.timeout,
             check=False,
+            cwd=str(self.settings.project_root),
         )
         result = AutoCadResult(
             name=script_path.stem,

@@ -14,8 +14,9 @@ def test_runner_builds_command_with_input(tmp_path, monkeypatch):
 
     recorded = {}
 
-    def fake_run(command, capture_output, text, encoding, timeout, check):
+    def fake_run(command, capture_output, text, encoding, timeout, check, cwd):
         recorded["command"] = command
+        recorded["cwd"] = cwd
         return SimpleNamespace(returncode=0, stdout="out", stderr="")
 
     monkeypatch.setattr("subprocess.run", fake_run)
@@ -33,6 +34,7 @@ def test_runner_builds_command_with_input(tmp_path, monkeypatch):
     assert result.returncode == 0
     assert recorded["command"] == [str(executable), "/i", str(input_dwg), "/s", str(script)]
     assert result.command == tuple(recorded["command"])
+    assert recorded["cwd"] == str(tmp_path)
 
 
 def test_runner_discover_raises_when_missing(tmp_path):
