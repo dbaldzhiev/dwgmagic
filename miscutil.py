@@ -54,7 +54,41 @@ def cleanup_old_logs(log_dir):
     """Rename existing log directory and create a fresh one."""
     if os.path.exists(log_dir):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        os.rename(log_dir, f"{log_dir}_backup_{timestamp}")
+        backup_dir = f"{log_dir}_backup_{timestamp}"
+        try:
+            os.rename(log_dir, backup_dir)
+        except OSError as exc:
+            message = (
+                f"Logs directory {log_dir} could not be archived ({exc}). "
+                "Continuing to reuse the existing directory."
+            )
+            if logger:
+                logger.info(message)
+            else:
+                print(message)
+
+            for entry in os.listdir(log_dir):
+                entry_path = os.path.join(log_dir, entry)
+                if os.path.isdir(entry_path):
+                    safe_remove(entry_path)
+                else:
+                    try:
+                        os.remove(entry_path)
+                    except PermissionError as remove_exc:
+                        if logger:
+                            logger.debug(
+                                "Skipping locked log file %s: %s", entry_path, remove_exc
+                            )
+                        else:
+                            print(f"Skipping locked log file {entry_path}: {remove_exc}")
+                    except Exception as remove_exc:
+                        if logger:
+                            logger.warning("Unable to remove %s: %s", entry_path, remove_exc)
+                        else:
+                            print(f"Unable to remove {entry_path}: {remove_exc}")
+        else:
+            create_directory(log_dir)
+            return
     create_directory(log_dir)
 
 def preprocess():
