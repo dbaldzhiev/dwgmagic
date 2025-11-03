@@ -85,6 +85,7 @@ class QueueProgressListener(PipelineListener, AutoCadProgressListener):
                     "name": result.name,
                     "succeeded": result.succeeded,
                     "details": result.details,
+                    "data": result.data,
                 },
             )
         )
