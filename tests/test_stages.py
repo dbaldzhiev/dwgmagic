@@ -37,7 +37,7 @@ def test_trusted_folder_check_stage(tmp_path):
 
     def run_script(script_path, logger, input_path=None):
         calls["script_path"] = script_path
-        return AutoCadResult(name="trusted", returncode=0, stdout="", stderr="")
+        return AutoCadResult(name="trusted", returncode=0, stdout="", stderr="", command=(str(script_path),))
 
     checker = TrustedFolderChecker(SimpleNamespace(run_script=run_script))
     stage = TrustedFolderCheckStage(checker, LoggerFactory(settings))
@@ -122,9 +122,12 @@ def test_autocad_stage_builds_jobs(tmp_path):
         def __init__(self):
             self.jobs = None
 
-        def execute(self, jobs, logger):
+        def execute(self, jobs, logger, *, listener=None):
             self.jobs = list(jobs)
-            return [AutoCadResult(name=job.name, returncode=0, stdout="", stderr="") for job in jobs]
+            return [
+                AutoCadResult(name=job.name, returncode=0, stdout="", stderr="", command=(job.name,))
+                for job in jobs
+            ]
 
     coordinator = FakeCoordinator()
     stage = AutoCadStage(coordinator, LoggerFactory(settings))

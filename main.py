@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
@@ -9,18 +10,11 @@ from rich.console import Console
 
 from dwgmagic.core.context import ProjectConfig, ProjectContext
 from dwgmagic.core.pipeline import PipelineRunner
-from dwgmagic.core.stages import (
-    AutoCadStage,
-    PreprocessorStage,
-    ScriptGenerationStage,
-    TrustedFolderCheckStage,
-)
+from dwgmagic.core.stages import build_default_stages
 from dwgmagic.integrations.autocad import AutoCadCoordinator, AutoCadRunner
 from dwgmagic.logger import LoggerFactory
-from dwgmagic.miscutil import Preprocessor
-from dwgmagic.script_generator import ScriptGenerator
 from dwgmagic.settings import Settings, load_settings
-from dwgmagic.trusted_folder import TrustedFolderChecker
+from dwgmagic.ui.progress import ConsoleProgressListener
 
 console = Console()
 
@@ -75,6 +69,7 @@ def parse_args() -> argparse.Namespace:
         help="Additional template search path (can be specified multiple times)",
     )
     parser.add_argument("--autocad-path", type=Path, help="Explicit path to accoreconsole.exe")
+    parser.add_argument("--gui", action="store_true", help="Launch the graphical interface")
     return parser.parse_args()
 
 
@@ -102,20 +97,38 @@ def main() -> None:
     runner = AutoCadRunner(settings)
     coordinator = AutoCadCoordinator(runner)
 
+    if args.gui:
+        from dwgmagic.gui.app import run_gui
+
+        run_gui(
+            settings=settings,
+            environment=environment,
+            runner=runner,
+            coordinator=coordinator,
+            base_logger_factory=logger_factory,
+        )
+        return
+
     display_title_bar()
 
-    stages = (
-        TrustedFolderCheckStage(TrustedFolderChecker(runner), logger_factory),
-        PreprocessorStage(Preprocessor(), logger_factory),
-        ScriptGenerationStage(ScriptGenerator(environment), logger_factory),
-        AutoCadStage(coordinator, logger_factory),
-    )
+    if settings.verbose:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(getattr(logging, settings.log_level))
+        console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        logger_factory = logger_factory.with_handlers(console_handler)
+
+    stages = build_default_stages(environment, logger_factory, runner, coordinator)
 
     config = ProjectConfig(settings=settings, stages=[stage.name for stage in stages])
     context = ProjectContext(config=config, environment=environment)
 
+    listener = ConsoleProgressListener(console)
+    context.set("autocad_listener", listener)
+
     pipeline = PipelineRunner.from_iterable(stages)
-    results = pipeline.run(context)
+    results = pipeline.run(context, listener=listener)
 
     for result in results:
         status = "✅" if result.succeeded else "❌"

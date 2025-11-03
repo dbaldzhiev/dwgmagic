@@ -25,9 +25,14 @@ def test_runner_builds_command_with_input(tmp_path, monkeypatch):
     input_dwg = tmp_path / "input.dwg"
     input_dwg.write_text("dwg")
 
-    result = runner.run_script(script_path=script, input_path=input_dwg, logger=SimpleNamespace(debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None))
+    result = runner.run_script(
+        script_path=script,
+        input_path=input_dwg,
+        logger=SimpleNamespace(debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None),
+    )
     assert result.returncode == 0
     assert recorded["command"] == [str(executable), "/i", str(input_dwg), "/s", str(script)]
+    assert result.command == tuple(recorded["command"])
 
 
 def test_runner_discover_raises_when_missing(tmp_path):
@@ -44,7 +49,13 @@ def test_coordinator_executes_jobs(tmp_path):
 
         def run_script(self, *, script_path, logger, input_path=None):
             self.calls.append((script_path, input_path))
-            return AutoCadResult(name=script_path.stem, returncode=0, stdout="", stderr="")
+            return AutoCadResult(
+                name=script_path.stem,
+                returncode=0,
+                stdout="",
+                stderr="",
+                command=(str(script_path),),
+            )
 
     runner = RecordingRunner()
     coordinator = AutoCadCoordinator(runner, max_workers=2)
@@ -53,10 +64,49 @@ def test_coordinator_executes_jobs(tmp_path):
         AutoCadJob(name="b", script_path=tmp_path / "b.scr", input_path=tmp_path / "b.dwg"),
     ]
     logger = SimpleNamespace(info=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None)
-    results = coordinator.execute(jobs, logger)
+    results = list(coordinator.execute(jobs, logger))
     assert len(results) == 2
     assert sorted(result.name for result in results) == ["a", "b"]
     assert set(runner.calls) == {
         (tmp_path / "a.scr", None),
         (tmp_path / "b.scr", tmp_path / "b.dwg"),
     }
+
+
+def test_coordinator_notifies_listener(tmp_path):
+    events = []
+
+    class RecordingRunner:
+        def run_script(self, *, script_path, logger, input_path=None):
+            return AutoCadResult(
+                name=script_path.stem,
+                returncode=0,
+                stdout="stdout",
+                stderr="stderr",
+                command=(str(script_path),),
+            )
+
+    class Listener:
+        def on_job_queued(self, job):
+            events.append(("queued", job.name))
+
+        def on_job_started(self, job):
+            events.append(("started", job.name))
+
+        def on_job_completed(self, result):
+            events.append(("completed", result.name, result.stdout, result.stderr))
+
+        def on_job_failed(self, job, error):  # pragma: no cover - not exercised here
+            events.append(("failed", job.name, str(error)))
+
+    runner = RecordingRunner()
+    coordinator = AutoCadCoordinator(runner, max_workers=1)
+    job = AutoCadJob(name="demo", script_path=tmp_path / "demo.scr", input_path=None)
+    logger = SimpleNamespace(info=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None)
+
+    list(coordinator.execute([job], logger, listener=Listener()))
+
+    assert ("queued", "demo") in events
+    assert ("started", "demo") in events
+    completed_events = [event for event in events if event[0] == "completed"]
+    assert completed_events and completed_events[0][1:] == ("demo", "stdout", "stderr")

@@ -3,14 +3,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import Iterable, List, Sequence, Tuple
 
 from dwgmagic.core.pipeline import PipelineStage
-from dwgmagic.integrations.autocad import AutoCadCoordinator, AutoCadJob
+from dwgmagic.integrations.autocad import AutoCadCoordinator, AutoCadJob, AutoCadRunner
 from dwgmagic.logger import LoggerFactory
 from dwgmagic.miscutil import Preprocessor
 from dwgmagic.script_generator import ScriptGenerator
 from dwgmagic.trusted_folder import TrustedFolderChecker
+from jinja2 import Environment
 
 from .context import ProjectContext, StageResult
 
@@ -87,7 +88,8 @@ class AutoCadStage(PipelineStage):
         logger = self.logger_factory.create("AUTOCAD")
         try:
             state = self._build_jobs(context)
-            results = self.coordinator.execute(state.jobs, logger)
+            listener = context.get("autocad_listener")
+            results = self.coordinator.execute(state.jobs, logger, listener=listener)
             context.set("autocad_results", results)
             return StageResult(self.name, True, data={"results": results})
         except Exception as exc:  # pragma: no cover - thin wrapper
@@ -141,4 +143,20 @@ class AutoCadStage(PipelineStage):
         )
 
         return AutoCadStage.StageJobs(tuple(jobs))
+
+
+def build_default_stages(
+    environment: Environment,
+    logger_factory: LoggerFactory,
+    runner: AutoCadRunner,
+    coordinator: AutoCadCoordinator,
+) -> Tuple[PipelineStage, ...]:
+    """Construct the default pipeline stages used by both CLI and GUI."""
+
+    return (
+        TrustedFolderCheckStage(TrustedFolderChecker(runner), logger_factory),
+        PreprocessorStage(Preprocessor(), logger_factory),
+        ScriptGenerationStage(ScriptGenerator(environment), logger_factory),
+        AutoCadStage(coordinator, logger_factory),
+    )
 
