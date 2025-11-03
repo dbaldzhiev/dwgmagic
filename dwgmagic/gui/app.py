@@ -93,8 +93,8 @@ class GuiApplication:
 
         self.root = tk.Tk()
         self.root.title("DWGMAGIC Pipeline Monitor")
-        self.root.geometry("1200x750")
-        self.root.minsize(1000, 700)
+        self.root.geometry("1280x860")
+        self.root.resizable(False, False)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.status_var = tk.StringVar(value="Ready")
@@ -162,17 +162,28 @@ class GuiApplication:
 
         table_frame = ttk.LabelFrame(self.root, text="Stages")
         table_frame.pack(fill=tk.X, padx=12, pady=(0, 10))
+
+        stage_container = ttk.Frame(table_frame)
+        stage_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=6)
+        stage_container.columnconfigure(0, weight=1)
+        stage_container.rowconfigure(0, weight=1)
+
+        stage_scroll_y = ttk.Scrollbar(stage_container, orient=tk.VERTICAL)
+        stage_scroll_y.grid(row=0, column=1, sticky=tk.NS)
+
         self.stage_table = ttk.Treeview(
-            table_frame,
+            stage_container,
             columns=("stage", "status"),
             show="headings",
             height=5,
+            yscrollcommand=stage_scroll_y.set,
         )
         self.stage_table.heading("stage", text="Stage")
         self.stage_table.heading("status", text="Status")
         self.stage_table.column("stage", width=220, anchor=tk.W)
         self.stage_table.column("status", width=160, anchor=tk.W)
-        self.stage_table.pack(fill=tk.X, padx=8, pady=6)
+        self.stage_table.grid(row=0, column=0, sticky=tk.NSEW)
+        stage_scroll_y.configure(command=self.stage_table.yview)
 
         paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 10))
@@ -201,11 +212,23 @@ class GuiApplication:
         )
         self.job_progress.pack(fill=tk.X, padx=8, pady=(0, 6))
 
+        tree_container = ttk.Frame(tasks_frame)
+        tree_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
+        tree_container.columnconfigure(0, weight=1)
+        tree_container.rowconfigure(0, weight=1)
+
+        tree_scroll_y = ttk.Scrollbar(tree_container, orient=tk.VERTICAL)
+        tree_scroll_y.grid(row=0, column=1, sticky=tk.NS)
+        tree_scroll_x = ttk.Scrollbar(tree_container, orient=tk.HORIZONTAL)
+        tree_scroll_x.grid(row=1, column=0, sticky=tk.EW)
+
         self.task_tree = ttk.Treeview(
-            tasks_frame,
+            tree_container,
             columns=("status", "code"),
             show="tree headings",
             selectmode="browse",
+            yscrollcommand=tree_scroll_y.set,
+            xscrollcommand=tree_scroll_x.set,
         )
         self.task_tree.heading("#0", text="Task")
         self.task_tree.heading("status", text="Status")
@@ -213,7 +236,9 @@ class GuiApplication:
         self.task_tree.column("#0", minwidth=220, stretch=True)
         self.task_tree.column("status", width=140, anchor=tk.W)
         self.task_tree.column("code", width=110, anchor=tk.CENTER)
-        self.task_tree.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
+        self.task_tree.grid(row=0, column=0, sticky=tk.NSEW)
+        tree_scroll_y.configure(command=self.task_tree.yview)
+        tree_scroll_x.configure(command=self.task_tree.xview)
         self.task_tree.bind("<<TreeviewSelect>>", self._on_task_selected)
 
         right_inner = ttk.Frame(right_container)

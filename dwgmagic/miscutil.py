@@ -21,6 +21,15 @@ class Preprocessor:
             raise RuntimeError("No DWG files found in project root")
 
         self._cleanup_previous_run(project_root, from_originals, logger)
+        if from_originals:
+            dwg_files = self._restore_project_root(project_root, dwg_files, logger)
+        else:
+            dwg_files = sorted(
+                entry
+                for entry in project_root.iterdir()
+                if entry.suffix.lower() == ".dwg" and entry.is_file()
+            )
+
         self._cleanup_logs(project_root / context.settings.log_dir, logger)
         self._ensure_directories(project_root, ("scripts", "originals", "derevitized"))
         self._populate_working_directories(project_root, dwg_files, from_originals, logger)
@@ -71,6 +80,19 @@ class Preprocessor:
                     else:
                         target.unlink(missing_ok=True)
 
+    def _restore_project_root(
+        self, root: Path, originals: Sequence[Path], logger
+    ) -> List[Path]:
+        restored: List[Path] = []
+        for source in originals:
+            destination = root / source.name
+            shutil.copy(source, destination)
+            restored.append(destination)
+        logger.info(
+            "Copied %d DWG files from originals back into project root", len(restored)
+        )
+        return sorted(restored)
+
     def _ensure_directories(self, root: Path, directories: Iterable[str]) -> None:
         for directory in directories:
             (root / directory).mkdir(exist_ok=True)
@@ -86,6 +108,7 @@ class Preprocessor:
             for source in files:
                 shutil.copy(source, derevitized / source.name)
                 count += 1
+                source.unlink(missing_ok=True)
             logger.info("Restored %d DWG files from originals", count)
         else:
             self._clear_directory(originals)
