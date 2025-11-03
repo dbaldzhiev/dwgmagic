@@ -123,17 +123,20 @@ def test_autocad_stage_builds_jobs(tmp_path):
 
     class FakeCoordinator:
         def __init__(self):
-            self.jobs = None
+            self.calls = []
 
         def execute(self, jobs, logger, *, listener=None):
-            self.jobs = list(jobs)
+            batch = list(jobs)
+            self.calls.append(batch)
             return [
                 AutoCadResult(name=job.name, returncode=0, stdout="", stderr="", command=(job.name,))
-                for job in jobs
+                for job in batch
             ]
 
     coordinator = FakeCoordinator()
     stage = AutoCadStage(coordinator, LoggerFactory(settings))
     result = stage.run(context)
     assert result.succeeded is True
-    assert [job.name for job in coordinator.jobs] == ["view:SheetA-View-1", "sheet:SheetA", "merge"]
+    assert [
+        [job.name for job in call] for call in coordinator.calls
+    ] == [["view:SheetA-View-1"], ["sheet:SheetA"], ["merge"]]

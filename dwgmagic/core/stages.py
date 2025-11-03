@@ -89,7 +89,25 @@ class AutoCadStage(PipelineStage):
         try:
             state = self._build_jobs(context)
             listener = context.get("autocad_listener")
-            results = self.coordinator.execute(state.jobs, logger, listener=listener)
+            results = []
+
+            def _run_batch(batch):
+                if not batch:
+                    return []
+                batch_results = list(
+                    self.coordinator.execute(batch, logger, listener=listener)
+                )
+                results.extend(batch_results)
+                return batch_results
+
+            view_jobs = [job for job in state.jobs if job.name.startswith("view:")]
+            sheet_jobs = [job for job in state.jobs if job.name.startswith("sheet:")]
+            merge_jobs = [job for job in state.jobs if job.name == "merge"]
+
+            _run_batch(view_jobs)
+            _run_batch(sheet_jobs)
+            _run_batch(merge_jobs)
+
             context.set("autocad_results", results)
             return StageResult(self.name, True, data={"results": results})
         except Exception as exc:  # pragma: no cover - thin wrapper
