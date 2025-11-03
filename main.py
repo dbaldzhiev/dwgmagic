@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 from rich.console import Console
 
 from dwgmagic.core.context import ProjectConfig, ProjectContext
@@ -26,8 +26,39 @@ console = Console()
 
 
 def build_environment(settings: Settings) -> Environment:
-    search_paths = [str(path) for path in settings.resolve_template_roots()]
-    loader = ChoiceLoader([FileSystemLoader(search_paths)])
+    """Construct a Jinja environment with resilient template discovery."""
+
+    seen = set()
+    search_paths = []
+
+    def _add_path(path: Path) -> None:
+        path_str = str(path)
+        if path_str not in seen:
+            seen.add(path_str)
+            search_paths.append(path_str)
+
+    for root in settings.resolve_template_roots():
+        _add_path(root)
+        _add_path(root / "templates")
+
+    # Always include the templates bundled with the application as a fallback.
+    bundled_templates = Path(__file__).resolve().parent / "templates"
+    _add_path(bundled_templates.parent)
+    _add_path(bundled_templates)
+
+    loaders = []
+    if search_paths:
+        loaders.append(FileSystemLoader(search_paths))
+
+    try:  # pragma: no cover - exercised indirectly when package data is available
+        loaders.append(PackageLoader("dwgmagic", "templates"))
+    except Exception:
+        pass
+
+    if not loaders:
+        raise RuntimeError("No template loaders could be configured")
+
+    loader = loaders[0] if len(loaders) == 1 else ChoiceLoader(loaders)
     return Environment(loader=loader, trim_blocks=True, lstrip_blocks=True)
 
 
