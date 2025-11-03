@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import shutil
+import zipfile
 from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,7 @@ class Preprocessor:
 
     def preprocess(self, context: ProjectContext, logger) -> List[str]:
         project_root = context.project_root
+        self._restore_from_archive(project_root, logger)
         dwg_files, from_originals = self._collect_dwg_files(project_root)
         if not dwg_files:
             raise RuntimeError("No DWG files found in project root")
@@ -29,6 +31,7 @@ class Preprocessor:
                 for entry in project_root.iterdir()
                 if entry.suffix.lower() == ".dwg" and entry.is_file()
             )
+            self._create_archive_backup(project_root, dwg_files, logger)
 
         self._cleanup_logs(project_root / context.settings.log_dir, logger)
         self._ensure_directories(project_root, ("scripts", "originals", "derevitized"))
@@ -79,6 +82,39 @@ class Preprocessor:
                         shutil.rmtree(target, ignore_errors=True)
                     else:
                         target.unlink(missing_ok=True)
+
+    def _restore_from_archive(self, root: Path, logger) -> None:
+        archive = root / "original.zip"
+        if not archive.exists():
+            return
+
+        logger.info("Restoring project from archive %s", archive)
+        for entry in root.iterdir():
+            if entry == archive:
+                continue
+            if entry.is_dir():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                entry.unlink(missing_ok=True)
+
+        with zipfile.ZipFile(archive, "r") as zip_file:
+            zip_file.extractall(root)
+
+    def _create_archive_backup(
+        self, root: Path, files: Sequence[Path], logger
+    ) -> None:
+        if not files:
+            return
+
+        archive = root / "original.zip"
+        try:
+            with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+                for path in files:
+                    zip_file.write(path, arcname=path.name)
+        except OSError as exc:  # pragma: no cover - disk issues are environment-specific
+            logger.warning("Unable to create archive %s: %s", archive, exc)
+        else:
+            logger.info("Created archive backup %s with %d files", archive, len(files))
 
     def _restore_project_root(
         self, root: Path, originals: Sequence[Path], logger
