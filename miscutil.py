@@ -61,12 +61,12 @@ def preprocess():
     global logger
     base_path = os.getcwd()
     remove_previous_preprocess(base_path)
+    cleanup_old_logs(os.path.join(base_path, "logs"))
     logger = setup_logger("MISC_UTIL")
     logger.info("Starting preprocessing")
     dwg_files = get_dwg_files_in_directory(base_path)
     for folder in ["scripts", "originals", "derevitized"]:
         create_directory(os.path.join(base_path, folder))
-    cleanup_old_logs(os.path.join(base_path, "logs"))
     
     logger.info("COPYING %d FILES", len(dwg_files))
     for file_name in dwg_files:
