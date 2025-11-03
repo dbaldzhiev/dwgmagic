@@ -5,6 +5,7 @@ import logging
 import queue
 import threading
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from typing import Sequence
@@ -86,10 +87,14 @@ class GuiApplication:
         self.status_var = tk.StringVar(value="Ready")
         self.progress_var = tk.DoubleVar(value=0.0)
         self.completed_stages = 0
+        self.job_total = 0
+        self.job_completed = 0
+        self.job_states: dict[str, dict[str, str | int | None]] = {}
         self._running = False
 
         self._build_layout()
         self._reset_stage_table()
+        self._reset_job_table()
         self.root.after(100, self._process_events)
 
     def _new_context(self) -> ProjectContext:
@@ -130,8 +135,45 @@ class GuiApplication:
         self.stage_table.column("status", width=150)
         self.stage_table.pack(fill=tk.X, padx=5, pady=5)
 
+        jobs_frame = ttk.LabelFrame(self.root, text="AutoCAD Jobs")
+        jobs_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        summary_frame = ttk.Frame(jobs_frame)
+        summary_frame.pack(fill=tk.X, padx=5, pady=(5, 0))
+        self.job_summary_var = tk.StringVar(value="Waiting to queue jobs")
+        ttk.Label(
+            summary_frame,
+            textvariable=self.job_summary_var,
+            font=("Segoe UI", 11),
+        ).pack(side=tk.LEFT)
+
+        self.job_progress_var = tk.DoubleVar(value=0.0)
+        self.job_progress = ttk.Progressbar(
+            jobs_frame,
+            variable=self.job_progress_var,
+            maximum=1,
+            mode="determinate",
+        )
+        self.job_progress.pack(fill=tk.X, padx=5, pady=(0, 5))
+
+        self.job_table = ttk.Treeview(
+            jobs_frame,
+            columns=("job", "script", "status", "code"),
+            show="headings",
+            height=8,
+        )
+        self.job_table.heading("job", text="Job")
+        self.job_table.heading("script", text="Script")
+        self.job_table.heading("status", text="Status")
+        self.job_table.heading("code", text="Return Code")
+        self.job_table.column("job", width=180)
+        self.job_table.column("script", width=280)
+        self.job_table.column("status", width=140)
+        self.job_table.column("code", width=110)
+        self.job_table.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
         log_frame = ttk.LabelFrame(self.root, text="Activity")
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         self.log_widget = ScrolledText(log_frame, state=tk.DISABLED, wrap=tk.WORD)
         self.log_widget.pack(fill=tk.BOTH, expand=True)
 
@@ -152,6 +194,40 @@ class GuiApplication:
     def _display_name(self, stage_name: str) -> str:
         return stage_name.replace("_", " ").title()
 
+    def _reset_job_table(self) -> None:
+        if hasattr(self, "job_table"):
+            for row in self.job_table.get_children():
+                self.job_table.delete(row)
+        self.job_total = 0
+        self.job_completed = 0
+        self.job_states.clear()
+        if hasattr(self, "job_progress"):
+            self.job_progress.configure(maximum=1)
+            self.job_progress_var.set(0.0)
+        if hasattr(self, "job_summary_var"):
+            self.job_summary_var.set("Waiting to queue jobs")
+        self._update_job_summary()
+
+    def _update_job_summary(self) -> None:
+        if not hasattr(self, "job_progress"):
+            return
+        if self.job_total:
+            summary = f"Jobs completed: {self.job_completed}/{self.job_total}"
+        else:
+            summary = "Waiting to queue jobs"
+        self.job_summary_var.set(summary)
+        self.job_progress.configure(maximum=max(self.job_total, 1))
+        self.job_progress_var.set(float(self.job_completed))
+
+    def _ensure_stage_row(self, name: str) -> None:
+        if not self.stage_table.exists(name):
+            self.stage_table.insert(
+                "",
+                tk.END,
+                iid=name,
+                values=(self._display_name(name), "Pending"),
+            )
+
     # Event handling ------------------------------------------------------
     def _start_pipeline(self) -> None:
         if self._running:
@@ -160,6 +236,7 @@ class GuiApplication:
         self.run_button.config(state=tk.DISABLED)
         self.status_var.set("Preparing pipeline...")
         self._reset_stage_table()
+        self._reset_job_table()
         self._append_log("Starting pipeline run...")
 
         self.context = self._new_context()
@@ -190,10 +267,12 @@ class GuiApplication:
         payload = event.payload
         if kind == "stage_started":
             name = payload["name"]
+            self._ensure_stage_row(name)
             self.stage_table.item(name, values=(self._display_name(name), "Running"))
             self.status_var.set(f"Running stage {self._display_name(name)}")
         elif kind == "stage_completed":
             name = payload["name"]
+            self._ensure_stage_row(name)
             status_text = "Completed" if payload.get("succeeded") else "Failed"
             self.completed_stages += 1
             self.stage_table.item(name, values=(self._display_name(name), status_text))
@@ -208,6 +287,7 @@ class GuiApplication:
             else:
                 self.status_var.set("Pipeline completed with errors")
                 self._append_log("Pipeline completed with errors", error=True)
+            self.progress_var.set(float(len(self.stage_names)))
         elif kind == "pipeline_error":
             self.status_var.set("Pipeline crashed")
             self._append_log(f"Pipeline crashed: {payload['error']}", error=True)
@@ -215,15 +295,73 @@ class GuiApplication:
             self._running = False
             self.run_button.config(state=tk.NORMAL)
         elif kind == "job_queued":
+            job_name = payload["name"]
+            script_path = payload.get("script") or ""
+            script_display = Path(script_path).name if script_path else "—"
+            if not self.job_table.exists(job_name):
+                self.job_table.insert(
+                    "",
+                    tk.END,
+                    iid=job_name,
+                    values=(job_name, script_display, "Queued", ""),
+                )
+            else:
+                self.job_table.item(
+                    job_name,
+                    values=(job_name, script_display, "Queued", ""),
+                )
+            self.job_states[job_name] = {"status": "Queued", "code": None}
+            self.job_total += 1
+            self._update_job_summary()
             self._append_log(
-                f"Queued job {payload['name']} (script: {payload['script']})"
+                f"Queued job {job_name} (script: {script_display})"
             )
         elif kind == "job_started":
-            self._append_log(f"Running job {payload['name']}")
+            job_name = payload["name"]
+            if not self.job_table.exists(job_name):
+                self.job_table.insert(
+                    "",
+                    tk.END,
+                    iid=job_name,
+                    values=(job_name, "—", "Running", ""),
+                )
+            else:
+                values = list(self.job_table.item(job_name, "values"))
+                if len(values) < 4:
+                    values = [job_name, "—", "Running", ""]
+                else:
+                    values[2] = "Running"
+                self.job_table.item(job_name, values=tuple(values))
+            self.job_states[job_name] = {"status": "Running", "code": None}
+            self._append_log(f"Running job {job_name}")
         elif kind == "job_completed":
             status = "succeeded" if payload.get("succeeded") else "failed"
+            job_name = payload["name"]
+            return_code = payload.get("returncode")
+            if self.job_table.exists(job_name):
+                values = list(self.job_table.item(job_name, "values"))
+                if len(values) < 4:
+                    values = [job_name, "—", "", ""]
+                values[2] = "Completed" if payload.get("succeeded") else "Failed"
+                values[3] = str(return_code) if return_code is not None else ""
+                self.job_table.item(job_name, values=tuple(values))
+                script_display = values[1]
+            else:
+                script_display = "—"
+                self.job_table.insert(
+                    "",
+                    tk.END,
+                    iid=job_name,
+                    values=(job_name, script_display, "Completed", str(return_code or "")),
+                )
+            self.job_states[job_name] = {
+                "status": "Completed" if payload.get("succeeded") else "Failed",
+                "code": return_code,
+            }
+            self.job_completed = min(self.job_total, self.job_completed + 1)
+            self._update_job_summary()
             self._append_log(
-                f"Job {payload['name']} {status} with code {payload['returncode']}"
+                f"Job {job_name} {status} with code {return_code} (script: {script_display})"
             )
             stdout = (payload.get("stdout") or "").strip()
             stderr = (payload.get("stderr") or "").strip()
@@ -232,8 +370,27 @@ class GuiApplication:
             if stderr:
                 self._append_log(stderr, error=not payload.get("succeeded"))
         elif kind == "job_failed":
+            job_name = payload["name"]
+            error_message = payload.get("error", "")
+            if not self.job_table.exists(job_name):
+                self.job_table.insert(
+                    "",
+                    tk.END,
+                    iid=job_name,
+                    values=(job_name, "—", "Failed", ""),
+                )
+            else:
+                values = list(self.job_table.item(job_name, "values"))
+                if len(values) < 4:
+                    values = [job_name, "—", "Failed", ""]
+                else:
+                    values[2] = "Failed"
+                self.job_table.item(job_name, values=tuple(values))
+            self.job_states[job_name] = {"status": "Failed", "code": None}
+            self.job_completed = min(self.job_total, self.job_completed + 1)
+            self._update_job_summary()
             self._append_log(
-                f"Job {payload['name']} failed: {payload['error']}",
+                f"Job {job_name} failed: {error_message}",
                 error=True,
             )
         elif kind == "log":
