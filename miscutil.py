@@ -59,11 +59,11 @@ def cleanup_old_logs(log_dir):
             os.rename(log_dir, backup_dir)
         except OSError as exc:
             message = (
-                f"Failed to archive existing logs at {log_dir}: {exc}. "
-                "Attempting to clear accessible log files in place."
+                f"Logs directory {log_dir} could not be archived ({exc}). "
+                "Continuing to reuse the existing directory."
             )
             if logger:
-                logger.warning(message)
+                logger.info(message)
             else:
                 print(message)
 
@@ -74,9 +74,16 @@ def cleanup_old_logs(log_dir):
                 else:
                     try:
                         os.remove(entry_path)
+                    except PermissionError as remove_exc:
+                        if logger:
+                            logger.debug(
+                                "Skipping locked log file %s: %s", entry_path, remove_exc
+                            )
+                        else:
+                            print(f"Skipping locked log file {entry_path}: {remove_exc}")
                     except Exception as remove_exc:
                         if logger:
-                            logger.error("Unable to remove %s: %s", entry_path, remove_exc)
+                            logger.warning("Unable to remove %s: %s", entry_path, remove_exc)
                         else:
                             print(f"Unable to remove {entry_path}: {remove_exc}")
         else:
