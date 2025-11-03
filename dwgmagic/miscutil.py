@@ -46,8 +46,15 @@ class Preprocessor:
     def _cleanup_previous_run(self, root: Path, rerun: bool, logger) -> None:
         originals = root / "originals"
         if rerun and originals.exists():
+            logger.info("Detected previous run; restoring project from originals")
+
+            preserved_suffixes = {".toml", ".tml", ".yaml", ".yml", ".json"}
+            preserved_names = {"originals"}
+
             for entry in root.iterdir():
-                if entry == originals:
+                if entry.name in preserved_names:
+                    continue
+                if entry.is_file() and entry.suffix.lower() in preserved_suffixes:
                     continue
                 if entry.is_dir():
                     shutil.rmtree(entry, ignore_errors=True)

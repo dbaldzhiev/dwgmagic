@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional, Protocol, Sequence, Tuple
 
@@ -130,11 +130,12 @@ class AutoCadCoordinator:
         listener: Optional["AutoCadProgressListener"],
     ) -> AutoCadResult:
         _notify(listener, "on_job_started", job)
-        return self.runner.run_script(
+        result = self.runner.run_script(
             script_path=job.script_path,
             input_path=job.input_path,
             logger=logger,
         )
+        return replace(result, name=job.name)
 
 
 class AutoCadProgressListener(Protocol):
