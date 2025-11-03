@@ -1,3 +1,4 @@
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -56,6 +57,10 @@ def test_preprocessor_stage(tmp_path):
     assert context.get("dwg_files") == ["example.dwg"]
     assert (tmp_path / "derevitized" / "example.dwg").exists()
     assert (tmp_path / "originals" / "example.dwg").exists()
+    archive = tmp_path / "original.zip"
+    assert archive.exists()
+    with zipfile.ZipFile(archive) as zip_file:
+        assert sorted(zip_file.namelist()) == ["example.dwg"]
 
 
 def test_preprocessor_stage_reruns_from_originals(tmp_path):
@@ -86,6 +91,29 @@ def test_preprocessor_stage_reruns_from_originals(tmp_path):
     assert not (scripts_dir / "old.scr").exists()
     assert not stale_root.exists()
     assert not (tmp_path / "rerun.dwg").exists()
+
+
+def test_preprocessor_stage_uses_archive_when_present(tmp_path):
+    context, settings = make_context(tmp_path)
+    archive = tmp_path / "original.zip"
+    with zipfile.ZipFile(archive, "w") as zip_file:
+        zip_file.writestr("archived.dwg", "archived")
+
+    stray = tmp_path / "stray.txt"
+    stray.write_text("obsolete")
+
+    stage = PreprocessorStage(Preprocessor(), LoggerFactory(settings))
+    result = stage.run(context)
+
+    assert result.succeeded is True
+    assert context.get("dwg_files") == ["archived.dwg"]
+    assert (tmp_path / "derevitized" / "archived.dwg").exists()
+    assert (tmp_path / "originals" / "archived.dwg").exists()
+    assert not (tmp_path / "archived.dwg").exists()
+    assert not stray.exists()
+
+    with zipfile.ZipFile(archive) as zip_file:
+        assert sorted(zip_file.namelist()) == ["archived.dwg"]
 
 
 def test_script_generation_stage(tmp_path):
