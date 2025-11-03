@@ -58,6 +58,31 @@ def test_preprocessor_stage(tmp_path):
     assert (tmp_path / "originals" / "example.dwg").exists()
 
 
+def test_preprocessor_stage_reruns_from_originals(tmp_path):
+    context, settings = make_context(tmp_path)
+    source = tmp_path / "rerun.dwg"
+    source.write_text("content")
+    stage = PreprocessorStage(Preprocessor(), LoggerFactory(settings))
+    first_result = stage.run(context)
+    assert first_result.succeeded is True
+
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    (scripts_dir / "old.scr").write_text("old")
+    derevitized_file = tmp_path / "derevitized" / "rerun.dwg"
+    derevitized_file.write_text("stale")
+
+    rerun_context, rerun_settings = make_context(tmp_path)
+    rerun_stage = PreprocessorStage(Preprocessor(), LoggerFactory(rerun_settings))
+    rerun_result = rerun_stage.run(rerun_context)
+
+    assert rerun_result.succeeded is True
+    assert rerun_context.get("dwg_files") == ["rerun.dwg"]
+    assert (tmp_path / "originals" / "rerun.dwg").exists()
+    assert (tmp_path / "derevitized" / "rerun.dwg").exists()
+    assert not (scripts_dir / "old.scr").exists()
+
+
 def test_script_generation_stage(tmp_path):
     context, settings = make_context(tmp_path)
     context.set("dwg_files", ["SheetA.dwg", "SheetA-View-1.dwg"])

@@ -31,3 +31,10 @@ template_roots = ["CONFIG_ROOT"]
     assert settings.verbose is True
     assert settings.autocad_executable == tmp_path / "cli_acc.exe"
     assert settings.template_roots == (cli_template,)
+
+
+def test_resolve_template_roots_defaults(tmp_path):
+    settings = load_settings(tmp_path)
+    roots = settings.resolve_template_roots()
+    assert settings.tectonica_path in roots
+    assert tmp_path in roots

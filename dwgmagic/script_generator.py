@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
 
-from jinja2 import Environment
+from jinja2 import Environment, TemplateNotFound
 
 from dwgmagic.core.context import ProjectContext
 
@@ -87,7 +87,10 @@ class ScriptGenerator:
         return artifacts
 
     def _render(self, template_name: str, destination: Path, context: ProjectContext, logger, **kwargs) -> Path:
-        template = self.environment.get_template(template_name)
+        try:
+            template = self.environment.get_template(template_name)
+        except TemplateNotFound:
+            template = self.environment.get_template(Path(template_name).name)
         rendered = template.render(
             tectonica_path=context.settings.tectonica_path,
             project_name=context.project_root.name,

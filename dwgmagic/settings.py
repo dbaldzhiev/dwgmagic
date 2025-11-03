@@ -35,7 +35,7 @@ class Settings:
     def with_project_root(self, root: Path) -> "Settings":
         return Settings(
             project_root=root,
-            template_roots=self.template_roots or (root,),
+            template_roots=self.template_roots,
             tectonica_path=self.tectonica_path,
             trusted_folder_script=self.trusted_folder_script,
             autocad_executable=self.autocad_executable,
@@ -50,7 +50,13 @@ class Settings:
     def resolve_template_roots(self) -> Tuple[Path, ...]:
         if self.template_roots:
             return self.template_roots
-        return (self.project_root,)
+
+        candidates = []
+        if self.tectonica_path:
+            candidates.append(self.tectonica_path)
+        if self.project_root and self.project_root not in candidates:
+            candidates.append(self.project_root)
+        return tuple(candidates)
 
 
 def _read_config_file(path: Path) -> Dict[str, object]:
@@ -143,7 +149,7 @@ def load_settings(
     if autocad_path:
         data["autocad_executable"] = autocad_path
 
-    data.setdefault("template_roots", [project_root])
+    data.setdefault("template_roots", [])
     data.setdefault("tectonica_path", Path("C:/dwgmagic"))
     data.setdefault("trusted_folder_script", Path("trustedFolderCheck.scr"))
     data.setdefault("log_dir", Path("logs"))
