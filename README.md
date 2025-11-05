@@ -10,6 +10,7 @@ The modernised architecture replaces historical global state with an explicit pi
 - **Rerun aware preprocessing** – Automatically cleans previous artefacts while preserving the `originals/` folder so projects can be processed multiple times without manual cleanup.
 
 ## Installation
+### Core requirements
 1. **Install Python 3.10+** on the machine that hosts AutoCAD.
 2. **Install dependencies** (from the project root):
    ```bash
@@ -17,6 +18,12 @@ The modernised architecture replaces historical global state with an explicit pi
    ```
 3. **Ensure AutoCAD is available** – the tool locates `accoreconsole.exe` using the configured search paths in `dwgmagic/settings.py` or via the `--autocad-path` CLI flag.
 4. *(Optional)* add the repository folder to AutoCAD’s trusted locations.
+
+### Windows desktop integration
+The repository now ships with helper scripts that set up shortcuts and shell integration for a smoother workflow on Windows:
+1. Run `install.bat` to copy the project into `%LOCALAPPDATA%\dwgmagic`, register a **Run with DWGMAGIC** context-menu entry for directories, and create a desktop shortcut that launches the GUI (`run_gui.bat`).
+2. After installation you can either double-click the desktop shortcut for the GUI or right-click any project directory and choose **Run with DWGMAGIC** to execute the CLI pipeline via `run_context_menu.bat`.
+3. To remove the integration, run `uninstall.bat`. This removes the context-menu entry, deletes the desktop shortcut, and wipes the installed copy under `%LOCALAPPDATA%\dwgmagic`.
 
 ## Usage
 ### Command-line interface
