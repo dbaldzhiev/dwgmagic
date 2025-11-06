@@ -8,6 +8,8 @@ if "%LOCALAPPDATA%"=="" (
 set "APP_NAME=DWGMAGIC"
 set "INSTALL_DIR=%LOCALAPPDATA%\dwgmagic"
 set "SOURCE_DIR=%~dp0"
+REM Ensure the source path remains safe to quote when copying the project files.
+if "%SOURCE_DIR:~-1%"=="\" set "SOURCE_DIR=%SOURCE_DIR%."
 set "SHORTCUT_NAME=%APP_NAME% GUI.lnk"
 set "CONTEXT_KEY=Software\Classes\Directory\shell\DWGMAGIC"
 set "ROBO_LOG=%TEMP%\dwgmagic_robocopy.log"
@@ -34,7 +36,7 @@ if %ROBOCOPY_EXIT% LSS 8 (
     )
     echo Attempting PowerShell fallback copy...
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-        "param([string]$src,[string]$dest); $ErrorActionPreference='Stop'; $excludes = @('.git','.mypy_cache','.pytest_cache','__pycache__'); if (-not (Test-Path -LiteralPath $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }; Get-ChildItem -LiteralPath $dest -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Get-ChildItem -LiteralPath $src -Force | Where-Object { $excludes -notcontains $_.Name } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $dest -Recurse -Force }" ^
+        "param([string]$src,[string]$dest); $ErrorActionPreference='Stop'; $excludes = @('.git','.mypy_cache','.pytest_cache','__pycache__'); $srcPath = (Resolve-Path -LiteralPath $src).ProviderPath; if (-not (Test-Path -LiteralPath $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }; $destPath = (Resolve-Path -LiteralPath $dest).ProviderPath; Get-ChildItem -LiteralPath $destPath -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Get-ChildItem -LiteralPath $srcPath -Force | Where-Object { $excludes -notcontains $_.Name } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $destPath -Recurse -Force }" ^
         "%SOURCE_DIR%" "%INSTALL_DIR%"
     if errorlevel 1 (
         echo ERROR: Fallback copy failed.
