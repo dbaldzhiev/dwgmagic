@@ -21,7 +21,7 @@ The modernised architecture replaces historical global state with an explicit pi
 
 ### Windows desktop integration
 The repository now ships with helper scripts that set up shortcuts and shell integration for a smoother workflow on Windows:
-1. Run `install.bat` to copy the project into `%LOCALAPPDATA%\dwgmagic`, register a **Run with DWGMAGIC** context-menu entry for directories, and create a desktop shortcut that launches the GUI (`run_gui.bat`).
+1. Run `install.bat` to copy the project into `%LOCALAPPDATA%\dwgmagic`, register a **Run with DWGMAGIC** context-menu entry for directories, and create a desktop shortcut that launches the GUI (`run_gui.bat`). If `robocopy` encounters a critical error (for example, exit code 16), the installer now prints the captured log and automatically retries the copy by using PowerShell so that the installation can still complete.
 2. After installation you can either double-click the desktop shortcut for the GUI or right-click any project directory and choose **Run with DWGMAGIC** to execute the CLI pipeline via `run_context_menu.bat`.
 3. To remove the integration, run `uninstall.bat`. This removes the context-menu entry, deletes the desktop shortcut, and wipes the installed copy under `%LOCALAPPDATA%\dwgmagic`.
 

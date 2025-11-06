@@ -10,6 +10,7 @@ set "INSTALL_DIR=%LOCALAPPDATA%\dwgmagic"
 set "SOURCE_DIR=%~dp0"
 set "SHORTCUT_NAME=%APP_NAME% GUI.lnk"
 set "CONTEXT_KEY=Software\Classes\Directory\shell\DWGMAGIC"
+set "ROBO_LOG=%TEMP%\dwgmagic_robocopy.log"
 
 echo Installing %APP_NAME% to "%INSTALL_DIR%"...
 if not exist "%INSTALL_DIR%" (
@@ -20,17 +21,35 @@ if not exist "%INSTALL_DIR%" (
 )
 
 echo Copying application files...
-robocopy "%SOURCE_DIR%" "%INSTALL_DIR%" /MIR /R:2 /W:5 /XD ".git" ".mypy_cache" ".pytest_cache" "__pycache__" >nul
+robocopy "%SOURCE_DIR%" "%INSTALL_DIR%" /MIR /R:2 /W:5 /XD ".git" ".mypy_cache" ".pytest_cache" "__pycache__" /NFL /NDL /NJH /NJS /LOG:"%ROBO_LOG%"
 set "ROBOCOPY_EXIT=%ERRORLEVEL%"
-if %ROBOCOPY_EXIT% GEQ 8 (
-    echo ERROR: File copy failed with code %ROBOCOPY_EXIT%.
-    exit /b %ROBOCOPY_EXIT%
+if %ROBOCOPY_EXIT% LSS 8 (
+    echo Files copied successfully.
+) else (
+    echo WARNING: Robocopy failed with code %ROBOCOPY_EXIT%.
+    if exist "%ROBO_LOG%" (
+        echo --- Robocopy output ---
+        type "%ROBO_LOG%"
+        echo --- End robocopy output ---
+    )
+    echo Attempting PowerShell fallback copy...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+        "param([string]$src,[string]$dest); $ErrorActionPreference='Stop'; $excludes = @('.git','.mypy_cache','.pytest_cache','__pycache__'); if (-not (Test-Path -LiteralPath $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }; Get-ChildItem -LiteralPath $dest -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Get-ChildItem -LiteralPath $src -Force | Where-Object { $excludes -notcontains $_.Name } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $dest -Recurse -Force }" ^
+        "%SOURCE_DIR%" "%INSTALL_DIR%"
+    if errorlevel 1 (
+        echo ERROR: Fallback copy failed.
+        if exist "%ROBO_LOG%" del "%ROBO_LOG%"
+        exit /b %ROBOCOPY_EXIT%
+    ) else (
+        echo Fallback copy succeeded.
+    )
 )
+if exist "%ROBO_LOG%" del "%ROBO_LOG%"
 
 echo Creating context menu entry...
 reg add "HKCU\%CONTEXT_KEY%" /ve /d "Run with DWGMAGIC" /f >nul
 reg add "HKCU\%CONTEXT_KEY%" /v "Icon" /d "\"%INSTALL_DIR%\\magic.ico\"" /f >nul
-reg add "HKCU\%CONTEXT_KEY%\\command" /ve /d "\"%INSTALL_DIR%\\run_context_menu.bat\" \"%%1\"" /f >nul
+reg add "HKCU\%CONTEXT_KEY%\command" /ve /d "\"%INSTALL_DIR%\\run_context_menu.bat\" \"%%1\"" /f >nul
 
 if exist "%INSTALL_DIR%\magic.ico" (
     set "SHORTCUT_ICON=%INSTALL_DIR%\magic.ico"
