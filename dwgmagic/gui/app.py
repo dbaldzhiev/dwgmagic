@@ -93,8 +93,8 @@ class GuiApplication:
 
         self.root = tk.Tk()
         self.root.title("DWGMAGIC Pipeline Monitor")
-        self.root.geometry("1280x860")
-        self.root.resizable(False, False)
+        self.root.minsize(1280, 860)
+        self.root.resizable(True, True)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.status_var = tk.StringVar(value="Ready")
@@ -161,7 +161,7 @@ class GuiApplication:
         self.progress_bar.pack(fill=tk.X)
 
         table_frame = ttk.LabelFrame(self.root, text="Stages")
-        table_frame.pack(fill=tk.X, padx=12, pady=(0, 10))
+        table_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 10))
 
         stage_container = ttk.Frame(table_frame)
         stage_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=6)
