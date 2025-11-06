@@ -191,6 +191,7 @@ class GuiApplication:
             button_frame, text="Run Pipeline", command=self._start_pipeline
         )
         self.run_button.pack(side=tk.LEFT)
+        self.run_button.config(state=tk.DISABLED)
         ttk.Button(button_frame, text="Close", command=self._on_close).pack(side=tk.RIGHT)
 
         paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
@@ -522,6 +523,7 @@ class GuiApplication:
         self._reset_task_tree()
         self.job_summary_var.set("Waiting to queue jobs")
         self._append_log(f"Loaded project at {project_root}")
+        self.run_button.config(state=tk.NORMAL)
 
     def _on_task_selected(self, _event) -> None:
         selection = self.task_tree.selection()
