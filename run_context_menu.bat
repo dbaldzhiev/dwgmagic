@@ -1,6 +1,6 @@
 @echo off
 setlocal
-REM Execute the DWGMAGIC pipeline against a selected directory
+REM Open the DWGMAGIC GUI preloaded with the selected directory and start the run
 if "%~1"=="" (
     echo Usage: %~nx0 ^<project directory^>
     exit /b 1
@@ -8,27 +8,29 @@ if "%~1"=="" (
 set "TARGET=%~1"
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
-if exist "venv\Scripts\python.exe" (
-    "venv\Scripts\python.exe" main.py "%TARGET%"
-    exit /b %errorlevel%
-)
-if exist "Scripts\python.exe" (
-    "Scripts\python.exe" main.py "%TARGET%"
-    exit /b %errorlevel%
-)
 if exist "venv\Scripts\pythonw.exe" (
-    "venv\Scripts\pythonw.exe" main.py "%TARGET%"
-    exit /b %errorlevel%
+    start "" "venv\Scripts\pythonw.exe" main.py "%TARGET%" --autorun
+    exit /b 0
+)
+if exist "venv\Scripts\python.exe" (
+    start "" "venv\Scripts\python.exe" main.py "%TARGET%" --autorun
+    exit /b 0
+)
+where pythonw >nul 2>&1
+if %errorlevel%==0 (
+    start "" pythonw main.py "%TARGET%" --autorun
+    exit /b 0
 )
 where py >nul 2>&1
 if %errorlevel%==0 (
-    py -3 main.py "%TARGET%"
-    exit /b %errorlevel%
+    start "" py -3 main.py "%TARGET%" --autorun
+    exit /b 0
 )
 where python >nul 2>&1
 if %errorlevel%==0 (
-    python main.py "%TARGET%"
-    exit /b %errorlevel%
+    start "" python main.py "%TARGET%" --autorun
+    exit /b 0
 )
-echo ERROR: No Python interpreter was found on PATH.
+echo ERROR: No Python interpreter was found. Run install.bat first.
+pause
 exit /b 9009

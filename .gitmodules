@@ -1,0 +1,3 @@
+[submodule "vendor/tectonica"]
+	path = vendor/tectonica
+	url = https://github.com/dbaldzhiev/tectonica.git

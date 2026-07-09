@@ -57,4 +57,8 @@ class StageResult:
     succeeded: bool
     details: Optional[str] = None
     data: Dict[str, Any] = field(default_factory=dict)
+    #: ISO timestamp of when the stage started (set by the pipeline runner).
+    started_at: Optional[str] = None
+    #: Wall-clock seconds the stage took (set by the pipeline runner).
+    duration: float = 0.0
 

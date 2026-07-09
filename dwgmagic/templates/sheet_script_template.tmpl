@@ -1,5 +1,5 @@
 {% if viewsOnSheet|length > 0 %}
-netload {{ tectonica_path }}/tectonica.dll
+netload "{{ tectonica_path }}/tectonica.dll"
 tecrnxref
 tecfixms
 {% for view in viewsOnSheet %}
