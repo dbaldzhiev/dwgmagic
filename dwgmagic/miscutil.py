@@ -264,7 +264,9 @@ class Preprocessor:
         try:
             log_dir.rename(backup_dir)
         except OSError as exc:
-            logger.info("Reusing existing log directory %s: %s", log_dir, exc)
+            # Expected whenever the active run.log lives inside it already.
+            logger.info("Reusing existing log directory %s", log_dir)
+            logger.debug("Log directory rename skipped: %s", exc)
             for entry in log_dir.iterdir():
                 if entry.is_dir():
                     shutil.rmtree(entry, ignore_errors=True)

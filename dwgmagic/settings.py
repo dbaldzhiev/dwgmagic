@@ -42,9 +42,9 @@ class Settings:
     log_encoding: str = "utf-8"
     log_level: str = "DEBUG"
     xref_xplode_toggle: bool = True
-    #: Maximum simultaneous accoreconsole processes. AutoCAD consoles are
-    #: heavyweight; running one per CPU can freeze a workstation.
-    max_workers: int = 2
+    #: Maximum simultaneous accoreconsole processes. Defaults to the CPU
+    #: count; reduce it explicitly (config/env/GUI) if the machine struggles.
+    max_workers: int = field(default_factory=lambda: os.cpu_count() or 4)
     #: Per-job timeout in seconds; a hung console job is killed after this.
     job_timeout: float = 1800.0
     #: Encoding used when writing generated .scr/.bat files.
@@ -189,7 +189,7 @@ def load_settings(
     if autocad_path:
         data["autocad_executable"] = autocad_path
 
-    max_workers = max(1, int(data.get("max_workers", 2)))
+    max_workers = max(1, int(data.get("max_workers", os.cpu_count() or 4)))
     job_timeout = float(data.get("job_timeout", 1800.0))
     if job_timeout <= 0:
         raise ValueError("job_timeout must be a positive number of seconds")

@@ -14,3 +14,4 @@ build
 # Built AutoCAD plugin (compiled from vendor/tectonica, see build_tectonica.ps1)
 /tectonica.dll
 /tectonica.pdb
+/logs

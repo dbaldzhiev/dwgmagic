@@ -1,6 +1,7 @@
 """AutoCAD integration layer with structured execution and progress reporting."""
 from __future__ import annotations
 
+import os
 import subprocess
 import threading
 import time
@@ -14,8 +15,13 @@ from dwgmagic.settings import DEFAULT_AUTOCAD_CANDIDATES, Settings
 
 #: accoreconsole frequently exits 0 despite failing; these markers in its
 #: output indicate a failed run regardless of the exit code.
+#:
+#: Note: a bare "Unknown command" is NOT fatal — the historic scripts feed
+#: XREF more tokens than it consumes when a drawing has no xrefs, and the
+#: spilled token triggers a harmless "Unknown command "R"". Only the
+#: tectonica plugin commands being unknown (NETLOAD failed) is fatal.
 FAILURE_MARKERS: Tuple[str, ...] = (
-    "Unknown command",
+    'Unknown command "TEC',
     "Unable to load",
     "eLoadFailed",
     "FATAL ERROR",
@@ -180,6 +186,8 @@ class AutoCadRunner:
             encoding="utf-16-le",
             errors="replace",
             cwd=str(self.settings.project_root),
+            # Never flash a console window per job (output is piped anyway).
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
 
         stdout_lines: List[str] = []
@@ -292,7 +300,7 @@ class AutoCadCoordinator:
             return self.max_workers
         settings = getattr(self.runner, "settings", None)
         configured = getattr(settings, "max_workers", None)
-        return max(1, int(configured or 2))
+        return max(1, int(configured or os.cpu_count() or 4))
 
     def execute(
         self,

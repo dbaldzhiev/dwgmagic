@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -69,7 +70,7 @@ def test_execution_tuning_settings(tmp_path):
 
 def test_defaults_are_sane(tmp_path):
     settings = load_settings(tmp_path, env={})
-    assert settings.max_workers == 2
+    assert settings.max_workers == (os.cpu_count() or 4)
     assert settings.job_timeout == 1800.0
     assert settings.continue_on_error is False
     assert settings.check_updates is True

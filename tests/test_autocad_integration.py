@@ -37,6 +37,7 @@ class FakePopen:
         encoding=None,
         errors=None,
         cwd=None,
+        **kwargs,
     ):
         FakePopen.last_instance = self
         self.command = command
@@ -128,6 +129,29 @@ def test_runner_detects_failure_marker_despite_zero_exit(tmp_path, monkeypatch):
     assert result.returncode == 0
     assert result.succeeded is False
     assert "Unknown command" in (result.failure_reason or "")
+
+
+def test_runner_ignores_benign_unknown_command_spill(tmp_path, monkeypatch):
+    """XREF token spill in no-xref drawings must not fail the job (see markers doc)."""
+
+    executable = tmp_path / "accoreconsole.exe"
+    executable.write_text("stub")
+    settings = Settings(project_root=tmp_path, autocad_executable=executable)
+    runner = AutoCadRunner(settings)
+
+    FakePopen.stdout_body = (
+        "No matching xref names found.\n"
+        'Command: r\n'
+        'Unknown command "R".  Press F1 for help.\n'
+    )
+    monkeypatch.setattr("dwgmagic.integrations.autocad.subprocess.Popen", FakePopen)
+
+    script = tmp_path / "script.scr"
+    script.write_text("script")
+    result = runner.run_script(script_path=script, logger=_quiet_logger())
+
+    assert result.succeeded is True
+    assert result.failure_reason is None
 
 
 def test_runner_streams_output_to_callback(tmp_path, monkeypatch):

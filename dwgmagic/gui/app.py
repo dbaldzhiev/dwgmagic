@@ -7,8 +7,10 @@ and update notifications from GitHub releases.
 from __future__ import annotations
 
 import logging
+import os
 import queue
 import threading
+import time
 import tkinter as tk
 import webbrowser
 from pathlib import Path
@@ -36,7 +38,7 @@ from dwgmagic.logger import LoggerFactory
 from dwgmagic.manifest import build_summary_lines, write_manifest
 from dwgmagic.miscutil import inspect_project
 from dwgmagic.settings import APP_ROOT, Settings
-from dwgmagic.trusted_folder import TrustedFolderChecker
+from dwgmagic.trusted_folder import TrustedFolderChecker, add_trusted_path
 from dwgmagic.ui.progress import ProgressEvent, QueueProgressListener
 from dwgmagic.update import check_for_update, launch_updater
 
@@ -160,6 +162,12 @@ class GuiApplication(_RootWindow):
         self._cancel_event: threading.Event | None = None
         self._autorun_pending = autorun and initial_project is not None
         self._update_info = None
+        self._run_started: float | None = None
+        self._trusted_fix_target: Path = APP_ROOT
+        self._trusted_fix_prompted = False
+        self.cpu_count = os.cpu_count() or 4
+        self.progress_text_var = tk.StringVar(value="")
+        self.elapsed_var = tk.StringVar(value="")
 
         self._build_layout()
         self._apply_tree_style()
@@ -198,7 +206,7 @@ class GuiApplication(_RootWindow):
         # --- Sidebar ---
         self.sidebar_frame = ctk.CTkFrame(self, width=240, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(10, weight=1)
+        self.sidebar_frame.grid_rowconfigure(11, weight=1)
 
         self.logo_label = ctk.CTkLabel(
             self.sidebar_frame, text="DWGMAGIC", font=ctk.CTkFont(size=24, weight="bold")
@@ -217,7 +225,7 @@ class GuiApplication(_RootWindow):
         ).grid(row=2, column=0, padx=20, pady=(10, 0))
 
         self.open_proj_btn = ctk.CTkButton(
-            self.sidebar_frame, text="Open Project", command=self._choose_project
+            self.sidebar_frame, text="Open Project…", command=self._choose_project
         )
         self.open_proj_btn.grid(row=3, column=0, padx=20, pady=(10, 4))
 
@@ -245,27 +253,51 @@ class GuiApplication(_RootWindow):
 
         self.run_button = ctk.CTkButton(
             self.sidebar_frame,
-            text="Run Pipeline",
+            text="▶   Run Pipeline",
             command=self._start_pipeline,
-            fg_color="green",
-            hover_color="darkgreen",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            height=36,
+            fg_color="#2fa572",
+            hover_color="#20744f",
         )
         self.run_button.grid(row=7, column=0, padx=20, pady=(0, 6))
         self.run_button.configure(state="disabled")
 
         self.cancel_button = ctk.CTkButton(
             self.sidebar_frame,
-            text="Cancel Run",
+            text="■   Cancel Run",
             command=self._cancel_pipeline,
-            fg_color="#a33",
-            hover_color="#7a2222",
+            fg_color="#b04a4a",
+            hover_color="#7a2f2f",
         )
         self.cancel_button.grid(row=8, column=0, padx=20, pady=(0, 10))
         self.cancel_button.configure(state="disabled")
 
+        # Execution options
+        workers_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        workers_frame.grid(row=9, column=0, padx=20, pady=(4, 0), sticky="ew")
+        ctk.CTkLabel(
+            workers_frame,
+            text="Parallel AutoCAD jobs",
+            anchor="w",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w")
+        worker_values = [str(i) for i in range(1, self.cpu_count + 1)]
+        self.workers_menu = ctk.CTkOptionMenu(workers_frame, values=worker_values, width=90,
+                                              command=self._on_workers_changed)
+        self.workers_menu.pack(anchor="w", pady=(4, 0))
+        chosen = self.gui_state.max_workers or self.cpu_count
+        chosen = max(1, min(chosen, self.cpu_count))
+        self.workers_menu.set(str(chosen))
+        self.workers_hint = ctk.CTkLabel(
+            workers_frame, font=ctk.CTkFont(size=10), text_color="gray60", text=""
+        )
+        self.workers_hint.pack(anchor="w")
+        self._refresh_workers_hint()
+
         # Preflight Checks Section
         preflight = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        preflight.grid(row=9, column=0, padx=20, pady=(10, 0), sticky="ew")
+        preflight.grid(row=10, column=0, padx=20, pady=(14, 0), sticky="ew")
         ctk.CTkLabel(
             preflight, text="Preflight Checks", anchor="w", font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w")
@@ -294,8 +326,19 @@ class GuiApplication(_RootWindow):
         )
         self.lbl_trust_status.pack(anchor="w", padx=(10, 0))
 
+        # Shown only when the trusted-path check fails and is fixable.
+        self.fix_trusted_btn = ctk.CTkButton(
+            preflight,
+            text="Fix trusted path",
+            command=self._on_fix_trusted_clicked,
+            fg_color="#b8860b",
+            hover_color="#8a6508",
+            height=26,
+            width=140,
+        )
+
         # Spacer
-        ctk.CTkLabel(self.sidebar_frame, text="").grid(row=10, column=0)
+        ctk.CTkLabel(self.sidebar_frame, text="").grid(row=11, column=0)
 
         # Update notification (hidden until an update is found)
         self.update_button = ctk.CTkButton(
@@ -309,14 +352,14 @@ class GuiApplication(_RootWindow):
 
         # Appearance Mode
         ctk.CTkLabel(self.sidebar_frame, text="Appearance Mode:", anchor="w").grid(
-            row=12, column=0, padx=20, pady=(10, 0)
+            row=13, column=0, padx=20, pady=(10, 0)
         )
         self.appearance_mode_optionmenu = ctk.CTkOptionMenu(
             self.sidebar_frame,
             values=["System", "Light", "Dark"],
             command=self._change_appearance_mode_event,
         )
-        self.appearance_mode_optionmenu.grid(row=13, column=0, padx=20, pady=(10, 20))
+        self.appearance_mode_optionmenu.grid(row=14, column=0, padx=20, pady=(10, 20))
         self.appearance_mode_optionmenu.set(self.gui_state.appearance)
 
         # --- Main Area ---
@@ -333,10 +376,25 @@ class GuiApplication(_RootWindow):
             self.status_frame, text="Status:", font=ctk.CTkFont(size=16, weight="bold")
         ).pack(side="left", padx=(0, 10))
 
-        ctk.CTkLabel(
+        self.status_value_label = ctk.CTkLabel(
             self.status_frame, textvariable=self.status_var, font=ctk.CTkFont(size=16)
-        ).pack(side="left")
+        )
+        self.status_value_label.pack(side="left")
 
+        self.elapsed_label = ctk.CTkLabel(
+            self.status_frame,
+            textvariable=self.elapsed_var,
+            font=ctk.CTkFont(size=13),
+            text_color="gray60",
+        )
+        self.elapsed_label.pack(side="left", padx=(14, 0))
+
+        self.progress_text_label = ctk.CTkLabel(
+            self.status_frame,
+            textvariable=self.progress_text_var,
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        self.progress_text_label.pack(side="right", padx=(0, 4))
         self.progress_bar = ctk.CTkProgressBar(self.status_frame)
         self.progress_bar.pack(side="right", fill="x", expand=True, padx=20)
         self.progress_bar.set(0)
@@ -486,11 +544,17 @@ class GuiApplication(_RootWindow):
             foreground=foreground,
             fieldbackground=background,
             borderwidth=0,
-            rowheight=25,
+            rowheight=27,
+            font=("Segoe UI", 10),
         )
         self.style.map("Treeview", background=[("selected", selected)])
         self.style.configure(
-            "Treeview.Heading", background=heading_bg, foreground=heading_fg, relief="flat"
+            "Treeview.Heading",
+            background=heading_bg,
+            foreground=heading_fg,
+            relief="flat",
+            font=("Segoe UI", 10, "bold"),
+            padding=(6, 4),
         )
         try:
             self.tasks_paned.configure(bg=paned_bg)
@@ -549,11 +613,13 @@ class GuiApplication(_RootWindow):
 
     # Preflight ------------------------------------------------------------
     def _run_startup_checks(self) -> None:
-        """Checks that make sense before any project is loaded."""
+        """Checks that run on every app start, before any project is loaded."""
 
         def _check() -> None:
+            acad_ok = False
             try:
                 exe = discover_autocad(None)
+                acad_ok = True
                 self.event_queue.put(
                     ProgressEvent(
                         "preflight",
@@ -584,14 +650,109 @@ class GuiApplication(_RootWindow):
                 )
             )
 
+            if acad_ok and dll.exists():
+                self._trusted_check_sync(Settings(project_root=APP_ROOT))
+            else:
+                self.event_queue.put(
+                    ProgressEvent(
+                        "preflight",
+                        {"check": "trusted", "status": "Skipped (see above)", "ok": None},
+                    )
+                )
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    def _trusted_check_sync(self, settings: Settings) -> None:
+        """Run the trusted-path check (blocking; call from a worker thread)."""
+
+        self.event_queue.put(
+            ProgressEvent("preflight", {"check": "trusted", "status": "Checking…", "ok": None})
+        )
+        try:
+            runner = self.runner_factory(settings)
+            TrustedFolderChecker(runner).check(settings, logging.getLogger("Preflight"))
+            self.event_queue.put(
+                ProgressEvent("preflight", {"check": "trusted", "status": "OK", "ok": True})
+            )
+        except Exception:
+            dll_present = (settings.tectonica_path / "tectonica.dll").exists()
             self.event_queue.put(
                 ProgressEvent(
                     "preflight",
-                    {"check": "trusted", "status": "Requires project", "ok": None},
+                    {
+                        "check": "trusted",
+                        "status": f"AutoCAD does not trust {settings.tectonica_path}",
+                        "ok": False,
+                        "fixable": dll_present,
+                        "target": str(settings.tectonica_path),
+                    },
                 )
             )
 
-        threading.Thread(target=_check, daemon=True).start()
+    def _on_fix_trusted_clicked(self) -> None:
+        self._apply_trusted_fix()
+
+    def _propose_trusted_fix(self) -> None:
+        """One-time per session: proactively offer to apply the registry fix."""
+
+        if self._trusted_fix_prompted:
+            return
+        self._trusted_fix_prompted = True
+        proceed = messagebox.askyesno(
+            "AutoCAD Trusted Path",
+            f"AutoCAD does not trust the DWGMAGIC folder:\n\n"
+            f"{self._trusted_fix_target}\n\n"
+            "Generated scripts load tectonica.dll from there, so pipeline "
+            "runs will fail until it is trusted.\n\n"
+            "Add it to AutoCAD's trusted locations now? (This updates the "
+            "TRUSTEDPATHS setting of your AutoCAD profiles — current user "
+            "only, no administrator rights needed.)",
+        )
+        if proceed:
+            self._apply_trusted_fix()
+
+    def _apply_trusted_fix(self) -> None:
+        """Append the app folder to AutoCAD's TRUSTEDPATHS and re-check."""
+
+        target = self._trusted_fix_target
+        self.fix_trusted_btn.configure(state="disabled", text="Fixing…")
+
+        def _fix() -> None:
+            try:
+                modified = add_trusted_path(target)
+                self.event_queue.put(
+                    ProgressEvent(
+                        "log",
+                        {
+                            "name": "Preflight",
+                            "level": "INFO",
+                            "message": (
+                                f"Added {target} to TRUSTEDPATHS of "
+                                f"{len(modified)} AutoCAD profile(s)"
+                                if modified
+                                else f"{target} was already trusted by every profile"
+                            ),
+                        },
+                    )
+                )
+            except Exception as exc:
+                self.event_queue.put(
+                    ProgressEvent(
+                        "preflight",
+                        {
+                            "check": "trusted",
+                            "status": f"Fix failed: {exc}",
+                            "ok": False,
+                            "fixable": True,
+                            "target": str(target),
+                        },
+                    )
+                )
+                return
+            settings = self.current_settings or Settings(project_root=APP_ROOT)
+            self._trusted_check_sync(settings)
+
+        threading.Thread(target=_fix, daemon=True).start()
 
     def _run_project_checks(self, settings: Settings) -> None:
         """Runs checks that depend on the loaded project settings."""
@@ -634,24 +795,7 @@ class GuiApplication(_RootWindow):
                 )
                 return
 
-            self.event_queue.put(
-                ProgressEvent(
-                    "preflight", {"check": "trusted", "status": "Checking…", "ok": None}
-                )
-            )
-            try:
-                checker = TrustedFolderChecker(runner)
-                checker.check(settings, logging.getLogger("Preflight"))
-                self.event_queue.put(
-                    ProgressEvent("preflight", {"check": "trusted", "status": "OK", "ok": True})
-                )
-            except Exception as exc:
-                self.event_queue.put(
-                    ProgressEvent(
-                        "preflight",
-                        {"check": "trusted", "status": f"Failed: {exc}", "ok": False},
-                    )
-                )
+            self._trusted_check_sync(settings)
 
         threading.Thread(target=_check, daemon=True).start()
 
@@ -781,6 +925,59 @@ class GuiApplication(_RootWindow):
     def _status_tag(self, status: str) -> str:
         return f"status:{status}"
 
+    _STATUS_GLYPHS = {
+        "pending": "Pending",
+        "queued": "•  Queued",
+        "running": "▶  Running",
+        "completed": "✓  Completed",
+        "failed": "✗  Failed",
+    }
+
+    def _status_display(self, status: str) -> str:
+        return self._STATUS_GLYPHS.get(status, status.capitalize())
+
+    _STATUS_COLORS = {
+        "info": ("gray10", "#DCE4EE"),
+        "running": "#d9a13d",
+        "ok": "#2fa572",
+        "error": "#e05a5a",
+        "warning": "#d9a13d",
+    }
+
+    def _set_status(self, text: str, kind: str = "info") -> None:
+        self.status_var.set(text)
+        self.status_value_label.configure(
+            text_color=self._STATUS_COLORS.get(kind, self._STATUS_COLORS["info"])
+        )
+
+    # Execution options ---------------------------------------------------
+    def _selected_workers(self) -> int:
+        try:
+            return max(1, min(int(self.workers_menu.get()), self.cpu_count))
+        except (ValueError, tk.TclError):
+            return self.cpu_count
+
+    def _on_workers_changed(self, value: str) -> None:
+        workers = self._selected_workers()
+        # Persist only explicit sub-max choices; None means "all CPUs".
+        self.gui_state.max_workers = None if workers == self.cpu_count else workers
+        self.gui_state.save()
+        self._refresh_workers_hint()
+
+    def _refresh_workers_hint(self) -> None:
+        selected = self._selected_workers()
+        if selected == self.cpu_count:
+            self.workers_hint.configure(text=f"all {self.cpu_count} CPUs (default)")
+        else:
+            self.workers_hint.configure(text=f"limited ({self.cpu_count} CPUs available)")
+
+    def _tick_elapsed(self) -> None:
+        if not self._running or self._run_started is None:
+            return
+        seconds = int(time.monotonic() - self._run_started)
+        self.elapsed_var.set(f"⏱ {seconds // 60}:{seconds % 60:02d}")
+        self.after(1000, self._tick_elapsed)
+
     @staticmethod
     def _format_duration(seconds: float | None) -> str:
         if seconds is None:
@@ -791,7 +988,7 @@ class GuiApplication(_RootWindow):
 
     def _set_stage_status(self, name: str, status: str, *, duration: float | None = None) -> None:
         normalised = status.lower()
-        display = status.capitalize()
+        display = self._status_display(normalised)
         self.stage_tree.item(
             name,
             values=(self._display_name(name), display, self._format_duration(duration)),
@@ -857,7 +1054,7 @@ class GuiApplication(_RootWindow):
             info["script"] = script
         if duration is not None:
             info["duration"] = duration
-        display_status = status.capitalize()
+        display_status = self._status_display(info["status"])
         code_display = "" if info.get("code") is None else str(info.get("code"))
         self.task_tree.item(
             job_name,
@@ -956,7 +1153,8 @@ class GuiApplication(_RootWindow):
         self.pipeline = PipelineRunner.from_iterable(self.stages)
 
         self.project_var.set(str(project_root))
-        self.status_var.set("Ready")
+        self._set_status("Ready")
+        self.title(f"DWGMAGIC v{dwgmagic.__version__} — {project_root.name}")
         self._reset_stage_table()
         self._reset_task_tree()
         self._append_log(f"Loaded project at {project_root}")
@@ -1059,11 +1257,19 @@ class GuiApplication(_RootWindow):
         self.run_button.configure(state="disabled")
         self.open_proj_btn.configure(state="disabled")
         self.recent_menu.configure(state="disabled")
-        self.cancel_button.configure(state="normal", text="Cancel Run")
-        self.status_var.set("Preparing pipeline...")
+        self.workers_menu.configure(state="disabled")
+        self.cancel_button.configure(state="normal", text="■   Cancel Run")
+        self._set_status("Preparing pipeline…", kind="running")
         self._reset_stage_table()
         self._reset_task_tree()
-        self._append_log("Starting pipeline run...")
+        workers = self._selected_workers()
+        if self.coordinator is not None:
+            self.coordinator.max_workers = workers
+        self._append_log(f"Starting pipeline run ({workers} parallel AutoCAD job(s))...")
+        self._run_started = time.monotonic()
+        self.elapsed_var.set("⏱ 0:00")
+        self.after(1000, self._tick_elapsed)
+        self.progress_text_var.set("0%")
 
         self._cancel_event = threading.Event()
         self.context = self._new_context()
@@ -1080,7 +1286,7 @@ class GuiApplication(_RootWindow):
             return
         self._cancel_event.set()
         self.cancel_button.configure(state="disabled", text="Cancelling…")
-        self.status_var.set("Cancelling — waiting for AutoCAD jobs to stop…")
+        self._set_status("Cancelling — waiting for AutoCAD jobs to stop…", kind="warning")
         self._append_log("Cancellation requested", level="warning")
 
     def _run_pipeline_thread(self) -> None:
@@ -1119,7 +1325,12 @@ class GuiApplication(_RootWindow):
         # While the AutoCAD stage runs, weight it by its job completion.
         if self.job_total > 0 and self.completed_stages < total_stages:
             fraction += (self.job_completed / self.job_total) / total_stages
-        self.progress_bar.set(min(1.0, fraction))
+        fraction = min(1.0, fraction)
+        self.progress_bar.set(fraction)
+        text = f"{int(fraction * 100)}%"
+        if self.job_total > 0:
+            text += f" · {self.job_completed}/{self.job_total} jobs"
+        self.progress_text_var.set(text)
 
     def _handle_event(self, event: ProgressEvent) -> None:
         kind = event.kind
@@ -1128,7 +1339,7 @@ class GuiApplication(_RootWindow):
             name = payload["name"]
             self._ensure_stage_row(name)
             self._set_stage_status(name, "running")
-            self.status_var.set(f"Running stage {self._display_name(name)}")
+            self._set_status(f"Running stage {self._display_name(name)}", kind="running")
         elif kind == "stage_completed":
             name = payload["name"]
             self._ensure_stage_row(name)
@@ -1147,14 +1358,15 @@ class GuiApplication(_RootWindow):
             succeeded = bool(results) and all(item.get("succeeded", False) for item in results)
             cancelled = self._cancel_event is not None and self._cancel_event.is_set()
             if cancelled and not succeeded:
-                self.status_var.set("Run cancelled")
+                self._set_status("Run cancelled", kind="warning")
                 self._append_log("Pipeline run cancelled", level="warning")
             elif succeeded:
-                self.status_var.set("Pipeline completed successfully")
+                self._set_status("Pipeline completed successfully", kind="ok")
                 self._append_log("Pipeline completed successfully")
                 self.progress_bar.set(1.0)
+                self.progress_text_var.set("100%")
             else:
-                self.status_var.set("Pipeline completed with errors")
+                self._set_status("Pipeline completed with errors", kind="error")
                 self._append_log("Pipeline completed with errors", level="error")
         elif kind == "summary":
             lines = payload.get("lines") or []
@@ -1169,7 +1381,7 @@ class GuiApplication(_RootWindow):
                 if failed and not cancelled:
                     messagebox.showerror("Run Failed", "\n".join(lines))
         elif kind == "pipeline_error":
-            self.status_var.set("Pipeline crashed")
+            self._set_status("Pipeline crashed", kind="error")
             self._append_log(f"Pipeline crashed: {payload['error']}", level="error")
         elif kind == "pipeline_thread_complete":
             self._running = False
@@ -1177,7 +1389,8 @@ class GuiApplication(_RootWindow):
             self.run_button.configure(state="normal")
             self.open_proj_btn.configure(state="normal")
             self.recent_menu.configure(state="normal")
-            self.cancel_button.configure(state="disabled", text="Cancel Run")
+            self.workers_menu.configure(state="normal")
+            self.cancel_button.configure(state="disabled", text="■   Cancel Run")
         elif kind == "job_queued":
             job_name = payload["name"]
             script_path = payload.get("script") or ""
@@ -1261,11 +1474,18 @@ class GuiApplication(_RootWindow):
             elif check == "trusted":
                 self.preflight_trusted.set(status)
                 self.lbl_trust_status.configure(text_color=color)
+                if payload.get("fixable"):
+                    self._trusted_fix_target = Path(payload.get("target") or APP_ROOT)
+                    self.fix_trusted_btn.configure(state="normal", text="Fix trusted path")
+                    self.fix_trusted_btn.pack(anchor="w", padx=(10, 0), pady=(6, 0))
+                    self._propose_trusted_fix()
+                else:
+                    self.fix_trusted_btn.pack_forget()
         elif kind == "update_available":
             self._update_info = payload
             latest = payload.get("latest", "?")
             self.update_button.configure(text=f"Update to v{latest}")
-            self.update_button.grid(row=11, column=0, padx=20, pady=(0, 10))
+            self.update_button.grid(row=12, column=0, padx=20, pady=(0, 10))
             self._append_log(
                 f"Update available: v{payload.get('current')} → v{latest} "
                 f"({payload.get('url')})"

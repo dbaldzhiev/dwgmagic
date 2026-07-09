@@ -21,6 +21,8 @@ class GuiState:
     geometry: str = "1400x900"
     appearance: str = "System"
     recent_projects: List[str] = field(default_factory=list)
+    #: None means "use all CPUs" (the default); an int is an explicit choice.
+    max_workers: int | None = None
 
     def remember_project(self, project: Path) -> None:
         entry = str(project)
@@ -44,6 +46,9 @@ class GuiState:
         recents = data.get("recent_projects")
         if isinstance(recents, list):
             state.recent_projects = [str(item) for item in recents][:_MAX_RECENT]
+        workers = data.get("max_workers")
+        if isinstance(workers, int) and workers >= 1:
+            state.max_workers = workers
         return state
 
     def save(self) -> None:
@@ -56,6 +61,7 @@ class GuiState:
                         "geometry": self.geometry,
                         "appearance": self.appearance,
                         "recent_projects": self.recent_projects,
+                        "max_workers": self.max_workers,
                     },
                     indent=2,
                 ),
