@@ -1,6 +1,8 @@
 """Runtime settings and configuration loading for DWGMAGIC."""
 from __future__ import annotations
 
+import dataclasses
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,17 +14,26 @@ except ModuleNotFoundError:  # pragma: no cover
     tomllib = None  # type: ignore
 
 
+#: Directory containing the application itself (repo checkout or installed copy).
+#: tectonica.dll, trustedFolderCheck.scr, and the bundled templates live here,
+#: so the app is relocatable instead of assuming C:/dwgmagic.
+APP_ROOT = Path(__file__).resolve().parent.parent
+
 DEFAULT_AUTOCAD_CANDIDATES = tuple(
-    Path("C:/Program Files/Autodesk/AutoCAD {year}/accoreconsole.exe".format(year=year))
-    for year in range(2017, 2026)
+    Path(f"C:/Program Files/Autodesk/AutoCAD {year}/accoreconsole.exe")
+    for year in range(2017, 2027)
 )
+
+_VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+
+GITHUB_REPO = "dbaldzhiev/dwgmagic"
 
 
 @dataclass(slots=True)
 class Settings:
     project_root: Path
     template_roots: Tuple[Path, ...] = field(default_factory=tuple)
-    tectonica_path: Path = Path("C:/dwgmagic")
+    tectonica_path: Path = APP_ROOT
     trusted_folder_script: Path = Path("trustedFolderCheck.scr")
     autocad_executable: Optional[Path] = None
     autocad_candidates: Tuple[Path, ...] = DEFAULT_AUTOCAD_CANDIDATES
@@ -31,21 +42,20 @@ class Settings:
     log_encoding: str = "utf-8"
     log_level: str = "DEBUG"
     xref_xplode_toggle: bool = True
+    #: Maximum simultaneous accoreconsole processes. AutoCAD consoles are
+    #: heavyweight; running one per CPU can freeze a workstation.
+    max_workers: int = 2
+    #: Per-job timeout in seconds; a hung console job is killed after this.
+    job_timeout: float = 1800.0
+    #: Encoding used when writing generated .scr/.bat files.
+    script_encoding: str = "cp1251"
+    #: Keep running remaining jobs/stages when an AutoCAD job fails.
+    continue_on_error: bool = False
+    #: Query GitHub for a newer release on GUI startup.
+    check_updates: bool = True
 
     def with_project_root(self, root: Path) -> "Settings":
-        return Settings(
-            project_root=root,
-            template_roots=self.template_roots,
-            tectonica_path=self.tectonica_path,
-            trusted_folder_script=self.trusted_folder_script,
-            autocad_executable=self.autocad_executable,
-            autocad_candidates=self.autocad_candidates,
-            verbose=self.verbose,
-            log_dir=self.log_dir,
-            log_encoding=self.log_encoding,
-            log_level=self.log_level,
-            xref_xplode_toggle=self.xref_xplode_toggle,
-        )
+        return dataclasses.replace(self, project_root=root)
 
     def resolve_template_roots(self) -> Tuple[Path, ...]:
         if self.template_roots:
@@ -88,6 +98,16 @@ def _normalise_sequence(value: object) -> Tuple[Path, ...]:
     return tuple(Path(item) for item in value)  # type: ignore[arg-type]
 
 
+def _validated_log_level(value: object) -> str:
+    level = str(value).upper()
+    if level not in _VALID_LOG_LEVELS:
+        raise ValueError(
+            f"Invalid log level {value!r}; expected one of {sorted(_VALID_LOG_LEVELS)}"
+        )
+    assert isinstance(getattr(logging, level), int)
+    return level
+
+
 def load_settings(
     project_root: Path,
     *,
@@ -123,6 +143,10 @@ def load_settings(
     if env_autocad:
         data["autocad_executable"] = env_autocad
 
+    env_tectonica = _env_path("TECTONICA_PATH")
+    if env_tectonica:
+        data["tectonica_path"] = env_tectonica
+
     env_log_dir = env.get("DWGMAGIC_LOG_DIR")
     if env_log_dir:
         data["log_dir"] = Path(env_log_dir)
@@ -135,6 +159,14 @@ def load_settings(
     if env_xref is not None:
         data["xref_xplode_toggle"] = env_xref
 
+    env_continue = _env_bool("CONTINUE_ON_ERROR")
+    if env_continue is not None:
+        data["continue_on_error"] = env_continue
+
+    env_updates = _env_bool("CHECK_UPDATES")
+    if env_updates is not None:
+        data["check_updates"] = env_updates
+
     env_log_level = env.get("DWGMAGIC_LOG_LEVEL")
     if env_log_level:
         data["log_level"] = env_log_level.upper()
@@ -143,33 +175,42 @@ def load_settings(
     if env_log_encoding:
         data["log_encoding"] = env_log_encoding
 
+    env_max_workers = env.get("DWGMAGIC_MAX_WORKERS")
+    if env_max_workers:
+        data["max_workers"] = int(env_max_workers)
+
+    env_job_timeout = env.get("DWGMAGIC_JOB_TIMEOUT")
+    if env_job_timeout:
+        data["job_timeout"] = float(env_job_timeout)
+
     # CLI overrides
     if template_roots:
         data["template_roots"] = list(template_roots)
     if autocad_path:
         data["autocad_executable"] = autocad_path
 
-    data.setdefault("template_roots", [])
-    data.setdefault("tectonica_path", Path("C:/dwgmagic"))
-    data.setdefault("trusted_folder_script", Path("trustedFolderCheck.scr"))
-    data.setdefault("log_dir", Path("logs"))
-    data.setdefault("log_encoding", "utf-8")
-    data.setdefault("log_level", "DEBUG")
-    data.setdefault("xref_xplode_toggle", True)
-    data.setdefault("autocad_candidates", DEFAULT_AUTOCAD_CANDIDATES)
+    max_workers = max(1, int(data.get("max_workers", 2)))
+    job_timeout = float(data.get("job_timeout", 1800.0))
+    if job_timeout <= 0:
+        raise ValueError("job_timeout must be a positive number of seconds")
 
     settings = Settings(
         project_root=project_root,
         template_roots=_normalise_sequence(data.get("template_roots")),
-        tectonica_path=Path(data.get("tectonica_path", "C:/dwgmagic")),
+        tectonica_path=Path(data.get("tectonica_path", APP_ROOT)),
         trusted_folder_script=Path(data.get("trusted_folder_script", "trustedFolderCheck.scr")),
         autocad_executable=Path(data["autocad_executable"]) if data.get("autocad_executable") else None,
         autocad_candidates=tuple(Path(path) for path in data.get("autocad_candidates", DEFAULT_AUTOCAD_CANDIDATES)),
         verbose=bool(data.get("verbose", verbose)),
         log_dir=Path(data.get("log_dir", "logs")),
         log_encoding=str(data.get("log_encoding", "utf-8")),
-        log_level=str(data.get("log_level", "DEBUG")),
+        log_level=_validated_log_level(data.get("log_level", "DEBUG")),
         xref_xplode_toggle=bool(data.get("xref_xplode_toggle", True)),
+        max_workers=max_workers,
+        job_timeout=job_timeout,
+        script_encoding=str(data.get("script_encoding", "cp1251")),
+        continue_on_error=bool(data.get("continue_on_error", False)),
+        check_updates=bool(data.get("check_updates", True)),
     )
 
     if verbose:
@@ -178,5 +219,10 @@ def load_settings(
     return settings
 
 
-__all__ = ["Settings", "load_settings", "DEFAULT_AUTOCAD_CANDIDATES"]
-
+__all__ = [
+    "Settings",
+    "load_settings",
+    "DEFAULT_AUTOCAD_CANDIDATES",
+    "APP_ROOT",
+    "GITHUB_REPO",
+]

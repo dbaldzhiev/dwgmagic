@@ -12,9 +12,32 @@ REM Ensure the source path remains safe to quote when copying the project files.
 if "%SOURCE_DIR:~-1%"=="\" set "SOURCE_DIR=%SOURCE_DIR%."
 set "SHORTCUT_NAME=%APP_NAME% GUI.lnk"
 set "CONTEXT_KEY=Software\Classes\Directory\shell\DWGMAGIC"
+set "CONTEXT_BG_KEY=Software\Classes\Directory\Background\shell\DWGMAGIC"
 set "ROBO_LOG=%TEMP%\dwgmagic_robocopy.log"
 
 echo Installing %APP_NAME% to "%INSTALL_DIR%"...
+
+if not exist "%SOURCE_DIR%\tectonica.dll" (
+    echo ERROR: tectonica.dll not found. Run build_tectonica.ps1 first to build it from vendor\tectonica.
+    exit /b 1
+)
+
+REM Locate a Python 3.10+ interpreter for the virtual environment.
+set "PY_CMD="
+where py >nul 2>nul && set "PY_CMD=py -3"
+if not defined PY_CMD (
+    where python >nul 2>nul && set "PY_CMD=python"
+)
+if not defined PY_CMD (
+    echo ERROR: Python 3.10+ was not found on PATH. Install it from https://www.python.org/downloads/
+    exit /b 1
+)
+%PY_CMD% -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: Python 3.10 or newer is required.
+    exit /b 1
+)
+
 if not exist "%INSTALL_DIR%" (
     mkdir "%INSTALL_DIR%" || (
         echo ERROR: Failed to create installation directory.
@@ -23,7 +46,7 @@ if not exist "%INSTALL_DIR%" (
 )
 
 echo Copying application files...
-robocopy "%SOURCE_DIR%" "%INSTALL_DIR%" /MIR /R:2 /W:5 /XD ".git" ".mypy_cache" ".pytest_cache" "__pycache__" /NFL /NDL /NJH /NJS /LOG:"%ROBO_LOG%"
+robocopy "%SOURCE_DIR%" "%INSTALL_DIR%" /MIR /R:2 /W:5 /XD ".git" ".github" ".mypy_cache" ".pytest_cache" ".ruff_cache" "__pycache__" "vendor" "venv" ".venv" ".conda" "sample_data" "logs" ".vscode" /NFL /NDL /NJH /NJS /LOG:"%ROBO_LOG%"
 set "ROBOCOPY_EXIT=%ERRORLEVEL%"
 if %ROBOCOPY_EXIT% LSS 8 (
     echo Files copied successfully.
@@ -36,7 +59,7 @@ if %ROBOCOPY_EXIT% LSS 8 (
     )
     echo Attempting PowerShell fallback copy...
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-        "param([string]$src,[string]$dest); $ErrorActionPreference='Stop'; $excludes = @('.git','.mypy_cache','.pytest_cache','__pycache__'); $srcPath = (Resolve-Path -LiteralPath $src).ProviderPath; if (-not (Test-Path -LiteralPath $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }; $destPath = (Resolve-Path -LiteralPath $dest).ProviderPath; Get-ChildItem -LiteralPath $destPath -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Get-ChildItem -LiteralPath $srcPath -Force | Where-Object { $excludes -notcontains $_.Name } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $destPath -Recurse -Force }" ^
+        "param([string]$src,[string]$dest); $ErrorActionPreference='Stop'; $excludes = @('.git','.github','.mypy_cache','.pytest_cache','.ruff_cache','__pycache__','vendor','venv','.venv','.conda','sample_data','logs','.vscode'); $srcPath = (Resolve-Path -LiteralPath $src).ProviderPath; if (-not (Test-Path -LiteralPath $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }; $destPath = (Resolve-Path -LiteralPath $dest).ProviderPath; Get-ChildItem -LiteralPath $destPath -Force | Where-Object { $excludes -notcontains $_.Name } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Get-ChildItem -LiteralPath $srcPath -Force | Where-Object { $excludes -notcontains $_.Name } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $destPath -Recurse -Force }" ^
         "%SOURCE_DIR%" "%INSTALL_DIR%"
     if errorlevel 1 (
         echo ERROR: Fallback copy failed.
@@ -48,10 +71,31 @@ if %ROBOCOPY_EXIT% LSS 8 (
 )
 if exist "%ROBO_LOG%" del "%ROBO_LOG%"
 
-echo Creating context menu entry...
+REM Create the virtual environment and install dependencies.
+if not exist "%INSTALL_DIR%\venv\Scripts\python.exe" (
+    echo Creating virtual environment...
+    %PY_CMD% -m venv "%INSTALL_DIR%\venv"
+    if errorlevel 1 (
+        echo ERROR: Failed to create the virtual environment.
+        exit /b 1
+    )
+)
+echo Installing Python dependencies...
+"%INSTALL_DIR%\venv\Scripts\python.exe" -m pip install --upgrade pip --quiet
+"%INSTALL_DIR%\venv\Scripts\python.exe" -m pip install -r "%INSTALL_DIR%\requirements.txt" --quiet
+if errorlevel 1 (
+    echo ERROR: Failed to install Python dependencies. Check your internet connection and retry.
+    exit /b 1
+)
+echo Dependencies installed.
+
+echo Creating context menu entries...
 reg add "HKCU\%CONTEXT_KEY%" /ve /d "Run with DWGMAGIC" /f >nul
 reg add "HKCU\%CONTEXT_KEY%" /v "Icon" /d "\"%INSTALL_DIR%\\magic.ico\"" /f >nul
 reg add "HKCU\%CONTEXT_KEY%\command" /ve /d "\"%INSTALL_DIR%\\run_context_menu.bat\" \"%%1\"" /f >nul
+reg add "HKCU\%CONTEXT_BG_KEY%" /ve /d "Run with DWGMAGIC" /f >nul
+reg add "HKCU\%CONTEXT_BG_KEY%" /v "Icon" /d "\"%INSTALL_DIR%\\magic.ico\"" /f >nul
+reg add "HKCU\%CONTEXT_BG_KEY%\command" /ve /d "\"%INSTALL_DIR%\\run_context_menu.bat\" \"%%V\"" /f >nul
 
 if exist "%INSTALL_DIR%\magic.ico" (
     set "SHORTCUT_ICON=%INSTALL_DIR%\magic.ico"
@@ -74,5 +118,5 @@ if exist "%SHORTCUT_TARGET%" (
     echo WARNING: GUI launcher script was not found; shortcut skipped.
 )
 
-echo Installation complete.
+echo Installation complete. Launch DWGMAGIC from the desktop shortcut or the folder context menu.
 exit /b 0

@@ -1,14 +1,98 @@
-"""Preprocessing utilities operating on explicit project context."""
+"""Preprocessing utilities operating on explicit project context.
+
+Destructive cleanup only happens after the folder has been positively
+identified as a DWGMAGIC project (DWGs at top level, a populated
+``originals/`` folder, or an ``original.zip`` archive). Anything else raises
+:class:`~dwgmagic.errors.NotAProjectError` without touching the folder.
+"""
 from __future__ import annotations
 
 import shutil
 import zipfile
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
 from dwgmagic.core.context import ProjectContext
+from dwgmagic.errors import NotAProjectError
+
+#: Configuration files that survive every cleanup pass.
+PRESERVED_SUFFIXES = {".toml", ".tml", ".yaml", ".yml", ".json"}
+PRESERVED_NAMES = {"originals", "original.zip"}
+
+
+@dataclass(slots=True)
+class ProjectInspection:
+    """Non-destructive snapshot of what a run would operate on."""
+
+    root: Path
+    #: ``archive`` | ``fresh`` | ``rerun`` | ``invalid``
+    mode: str
+    dwg_names: List[str] = field(default_factory=list)
+    #: True when the folder has never been processed by DWGMAGIC before.
+    first_run: bool = False
+
+    @property
+    def is_project(self) -> bool:
+        return self.mode != "invalid"
+
+    def describe(self) -> str:
+        if not self.is_project:
+            return "No DWG files, originals/ folder, or original.zip archive found."
+        source = {
+            "archive": "original.zip archive",
+            "fresh": "DWG files in the folder",
+            "rerun": "originals/ folder (rerun)",
+        }[self.mode]
+        return f"{len(self.dwg_names)} DWG file(s) from {source}"
+
+
+def inspect_project(root: Path) -> ProjectInspection:
+    """Classify a folder without modifying it."""
+
+    archive = root / "original.zip"
+    if archive.exists():
+        try:
+            with zipfile.ZipFile(archive, "r") as zip_file:
+                archived = [
+                    name
+                    for name in zip_file.namelist()
+                    if name.lower().endswith(".dwg") and "/" not in name.strip("/")
+                ]
+        except (zipfile.BadZipFile, OSError):
+            archived = []
+        if archived:
+            return ProjectInspection(root=root, mode="archive", dwg_names=sorted(archived))
+
+    root_files = sorted(
+        entry.name
+        for entry in root.iterdir()
+        if entry.is_file() and entry.suffix.lower() == ".dwg"
+    )
+    if root_files:
+        first_run = not (root / "originals").exists() and not archive.exists()
+        return ProjectInspection(
+            root=root, mode="fresh", dwg_names=root_files, first_run=first_run
+        )
+
+    originals = root / "originals"
+    if originals.exists():
+        original_files = sorted(
+            entry.name
+            for entry in originals.iterdir()
+            if entry.is_file() and entry.suffix.lower() == ".dwg"
+        )
+        if original_files:
+            return ProjectInspection(root=root, mode="rerun", dwg_names=original_files)
+
+    return ProjectInspection(root=root, mode="invalid")
+
+
+def _is_preserved(entry: Path) -> bool:
+    if entry.name in PRESERVED_NAMES:
+        return True
+    return entry.is_file() and entry.suffix.lower() in PRESERVED_SUFFIXES
 
 
 @dataclass(slots=True)
@@ -17,10 +101,21 @@ class Preprocessor:
 
     def preprocess(self, context: ProjectContext, logger) -> List[str]:
         project_root = context.project_root
-        self._restore_from_archive(project_root, logger)
+        inspection = inspect_project(project_root)
+        if not inspection.is_project:
+            raise NotAProjectError(
+                f"{project_root} does not look like a DWGMAGIC project: "
+                f"{inspection.describe()}",
+                hint="Point DWGMAGIC at a folder containing the exported DWG files.",
+            )
+        logger.info("Project source: %s", inspection.describe())
+
+        if inspection.mode == "archive":
+            self._restore_from_archive(project_root, logger)
+
         dwg_files, from_originals = self._collect_dwg_files(project_root)
         if not dwg_files:
-            raise RuntimeError("No DWG files found in project root")
+            raise NotAProjectError("No DWG files found in project root")
 
         self._cleanup_previous_run(project_root, from_originals, logger)
         if from_originals:
@@ -59,14 +154,8 @@ class Preprocessor:
         originals = root / "originals"
         if rerun and originals.exists():
             logger.info("Detected previous run; restoring project from originals")
-
-            preserved_suffixes = {".toml", ".tml", ".yaml", ".yml", ".json"}
-            preserved_names = {"originals"}
-
             for entry in root.iterdir():
-                if entry.name in preserved_names:
-                    continue
-                if entry.is_file() and entry.suffix.lower() in preserved_suffixes:
+                if _is_preserved(entry):
                     continue
                 if entry.is_dir():
                     shutil.rmtree(entry, ignore_errors=True)
@@ -85,13 +174,13 @@ class Preprocessor:
 
     def _restore_from_archive(self, root: Path, logger) -> None:
         archive = root / "original.zip"
-        if not archive.exists():
-            return
-
         logger.info("Restoring project from archive %s", archive)
         for entry in root.iterdir():
             if entry == archive:
                 continue
+            if entry.is_file() and entry.suffix.lower() in PRESERVED_SUFFIXES:
+                continue
+            # Everything else (including originals/) is superseded by the archive.
             if entry.is_dir():
                 shutil.rmtree(entry, ignore_errors=True)
             else:
@@ -190,5 +279,4 @@ class Preprocessor:
             log_dir.mkdir(parents=True, exist_ok=True)
 
 
-__all__ = ["Preprocessor"]
-
+__all__ = ["Preprocessor", "ProjectInspection", "inspect_project"]

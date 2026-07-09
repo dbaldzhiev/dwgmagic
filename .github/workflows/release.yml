@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Verify tag matches package version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $version = python -c "import dwgmagic; print(dwgmagic.__version__)"
+          if ($tag -ne $version) {
+            Write-Error "Tag v$tag does not match dwgmagic.__version__ ($version). Bump dwgmagic/__init__.py before tagging."
+          }
+
+      - name: Run tests
+        run: python -m pytest -v
+
+      - name: Build source archive
+        shell: pwsh
+        run: |
+          git archive --format=zip --output "dwgmagic-${{ github.ref_name }}.zip" HEAD
+
+      # Note: tectonica.dll is NOT built here because the ObjectARX SDK is
+      # proprietary and unavailable in CI. The in-app updater intentionally
+      # preserves the locally built DLL; see README for details.
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dwgmagic-${{ github.ref_name }}.zip
+          generate_release_notes: true

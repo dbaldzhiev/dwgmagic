@@ -54,6 +54,11 @@ class ConsoleProgressListener(PipelineListener, AutoCadProgressListener):
     def on_job_started(self, job: AutoCadJob) -> None:
         self.console.log(f"[yellow]Running AutoCAD job[/yellow] {job.name}")
 
+    def on_job_output(self, job_name: str, line: str) -> None:
+        # Raw console chatter is only interesting in the job dump files;
+        # keep the CLI readable by not echoing it here.
+        pass
+
     def on_job_completed(self, result: AutoCadResult) -> None:
         symbol = "✅" if result.succeeded else "❌"
         self.console.log(
@@ -86,6 +91,7 @@ class QueueProgressListener(PipelineListener, AutoCadProgressListener):
                     "succeeded": result.succeeded,
                     "details": result.details,
                     "data": result.data,
+                    "duration": result.duration,
                 },
             )
         )
@@ -112,6 +118,9 @@ class QueueProgressListener(PipelineListener, AutoCadProgressListener):
     def on_job_started(self, job: AutoCadJob) -> None:
         self.queue.put(ProgressEvent("job_started", {"name": job.name}))
 
+    def on_job_output(self, job_name: str, line: str) -> None:
+        self.queue.put(ProgressEvent("job_output", {"name": job_name, "line": line}))
+
     def on_job_completed(self, result: AutoCadResult) -> None:
         self.queue.put(
             ProgressEvent(
@@ -123,6 +132,8 @@ class QueueProgressListener(PipelineListener, AutoCadProgressListener):
                     "stdout": result.stdout,
                     "stderr": result.stderr,
                     "command": list(result.command),
+                    "duration": result.duration,
+                    "failure_reason": result.failure_reason,
                 },
             )
         )

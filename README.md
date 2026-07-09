@@ -1,75 +1,127 @@
 # DWGMAGIC
 
-DWGMAGIC automates the end-to-end workflow for converting batches of Revit-exported DWG files into a single deliverable package.  
-The modernised architecture replaces historical global state with an explicit pipeline that can be monitored from either the CLI or a Tkinter-based GUI.
+DWGMAGIC automates the end-to-end workflow for converting batches of Revit-exported DWG files into a single deliverable package.
+The pipeline (trusted-folder validation → preprocessing → script generation → AutoCAD console execution) can be driven from a full-featured GUI (the default) or a headless CLI.
 
 ## Key Features
-- **Pipeline orchestration** – Trusted-folder validation, preprocessing, script generation, and AutoCAD execution run as discrete stages with shared context.
-- **Resilient AutoCAD execution** – Structured job objects, safe subprocess handling, and sequential batching guarantee that merge jobs only run after sheet outputs exist.
-- **Interactive monitoring** – Rich-based CLI progress reporter plus an enhanced GUI that streams stage status, AutoCAD job details, and live logs.
-- **Rerun aware preprocessing** – Automatically cleans previous artefacts while preserving the `originals/` folder so projects can be processed multiple times without manual cleanup.
+- **Pipeline orchestration** — discrete stages with shared context, per-stage timing, and structured results.
+- **Resilient AutoCAD execution** — bounded parallelism, per-job timeouts, live console output streaming, cancellation, and failure detection that catches jobs which "succeed" with a zero exit code but fail in their output.
+- **Output validation** — sheet batches must actually produce their `*_xrefed.dwg` files before the merge is attempted; the final deliverables (`<project>_MXR.dwg`, `<project>_MM.dwg`) are verified and reported with sizes.
+- **Safety guardrails** — preprocessing refuses to touch folders that don't look like DWGMAGIC projects, and the GUI asks for confirmation before the first run in a folder.
+- **Run tracking** — every run writes a chronological `logs/run.log`, per-job console dumps under `logs/jobs/`, and a machine-readable manifest `logs/run_<timestamp>.json` (settings, stages, jobs, durations, deliverables).
+- **Auto-update** — the GUI checks GitHub releases on startup and can update itself in place; `update.bat` works standalone too.
 
 ## Installation
-### Core requirements
-1. **Install Python 3.10+** on the machine that hosts AutoCAD.
-2. **Install dependencies** (from the project root):
-   ```bash
-   python -m pip install -r requirements.txt
-   ```
-3. **Ensure AutoCAD is available** – the tool locates `accoreconsole.exe` using the configured search paths in `dwgmagic/settings.py` or via the `--autocad-path` CLI flag.
-4. *(Optional)* add the repository folder to AutoCAD’s trusted locations.
 
-### Windows desktop integration
-The repository now ships with helper scripts that set up shortcuts and shell integration for a smoother workflow on Windows:
-1. Run `install.bat` to copy the project into `%LOCALAPPDATA%\dwgmagic`, register a **Run with DWGMAGIC** context-menu entry for directories, and create a desktop shortcut that launches the GUI (`run_gui.bat`). If `robocopy` encounters a critical error (for example, exit code 16), the installer now prints the captured log and automatically retries the copy by using PowerShell so that the installation can still complete.
-2. After installation you can either double-click the desktop shortcut for the GUI or right-click any project directory and choose **Run with DWGMAGIC** to execute the CLI pipeline via `run_context_menu.bat`.
-3. To remove the integration, run `uninstall.bat`. This removes the context-menu entry, deletes the desktop shortcut, and wipes the installed copy under `%LOCALAPPDATA%\dwgmagic`.
+### End users (Windows)
+1. Download the latest release zip (or clone the repo) and unpack it anywhere.
+2. Make sure `tectonica.dll` is present in the folder (ships with releases built locally; otherwise see [Building tectonica.dll](#building-tectonicadll)).
+3. Run `install.bat`. It will:
+   - copy the application to `%LOCALAPPDATA%\dwgmagic`,
+   - create a private Python virtual environment and install all dependencies (requires Python 3.10+ on PATH),
+   - register **Run with DWGMAGIC** in the right-click menu of folders (and folder backgrounds),
+   - create a desktop shortcut that opens the GUI.
+4. Launch from the desktop shortcut, or right-click a project folder → **Run with DWGMAGIC** (opens the GUI preloaded and starts the run).
+
+To remove everything, run `uninstall.bat` (removes the context-menu entries, desktop shortcut, and the installed copy).
+
+### Developers (from source)
+```bash
+git clone --recurse-submodules https://github.com/dbaldzhiev/dwgmagic.git
+cd dwgmagic
+python -m pip install -r requirements.txt   # or: pip install -e .[gui,dev]
+python main.py                              # opens the GUI
+```
+The [tectonica](https://github.com/dbaldzhiev/tectonica) AutoCAD plugin is a git submodule under `vendor/tectonica`; run `git submodule update --init --recursive` if you cloned without `--recurse-submodules`.
+
+## Updating
+
+- **From the GUI** — when a newer GitHub release exists, an **Update to vX.Y.Z** button appears in the sidebar. Clicking it closes the app, applies the update, reinstalls dependencies, and relaunches.
+- **Manually** — run `update.bat` in the application folder. Git checkouts are updated with `git pull --ff-only`; installed copies download the latest release archive. The updater preserves `venv/`, `logs/`, and your locally built `tectonica.dll`.
+- Set the environment variable `DWGMAGIC_CHECK_UPDATES=0` (or pass `--no-update-check`) to disable the startup check.
 
 ## Usage
-### Command-line interface
-```bash
-python main.py <project_directory> [--verbose] [--config path/to/settings.toml]
-```
-Common flags:
-- `--template-root PATH` – supply additional template search roots.
-- `--autocad-path PATH` – point directly to `accoreconsole.exe`.
-- `--verbose` – stream detailed logs to the terminal.
 
-### Graphical interface
+### GUI (default)
 ```bash
-python main.py <project_directory> --gui
+python main.py [project_directory]
 ```
-The GUI displays:
-- Stage progress with automatic completion tracking.
-- A detailed AutoCAD job table including script names, live status updates, and return codes.
-- Streaming log output for deep troubleshooting.
-Use the **Run Pipeline** button to start the process; the interface becomes interactive again once execution completes.
+Opens the pipeline monitor. Features:
+- Open a project via the button, the recent-projects list, or by dropping a folder onto the window.
+- Preflight checks for AutoCAD, the tectonica.dll plugin, and the trusted-path configuration.
+- Stage table with per-stage timing; task tree with per-job status, exit codes, durations, and **live AutoCAD console output**.
+- **Cancel Run** button that stops scheduling new jobs and kills running AutoCAD consoles.
+- A run summary (deliverables + sizes, failed jobs with reasons) at the end of every run.
+- Light/Dark/System appearance; window size, appearance, and recent projects persist between sessions.
+
+`--autorun` starts the pipeline automatically once the project loads (used by the context-menu integration).
+
+### CLI (headless)
+```bash
+python main.py <project_directory> --cli [--verbose] [--config path/to/settings.toml]
+```
+Prints stage progress and a run summary; the exit code is `0` on success, `1` on failure, `130` when cancelled with Ctrl+C — suitable for scripting.
+
+Common flags (both front-ends):
+- `--template-root PATH` — additional template search roots (repeatable).
+- `--autocad-path PATH` — explicit path to `accoreconsole.exe`.
+- `--verbose` — stream detailed logs to the terminal.
+- `--version` — print the application version.
 
 ## Configuration
-Runtime settings are encapsulated by the [`Settings` dataclass](dwgmagic/settings.py). Configuration values can be supplied by:
-1. CLI flags (highest precedence).
-2. A TOML/YAML file provided via `--config`.
-3. Environment variables (see `load_settings` in `dwgmagic/settings.py`).
-The configuration controls AutoCAD discovery, template search paths, logging behaviour, and feature toggles.
+Runtime settings are defined by the [`Settings` dataclass](dwgmagic/settings.py). Precedence: CLI flags > config file (`--config`, TOML/YAML) > environment variables > defaults.
+
+| Setting | Env var | Default | Purpose |
+| --- | --- | --- | --- |
+| `autocad_executable` | `DWGMAGIC_AUTOCAD_PATH` | auto-discovered | Explicit `accoreconsole.exe` path. Discovery checks the registry, then `C:\Program Files\Autodesk\AutoCAD 2017–2026`. |
+| `tectonica_path` | `DWGMAGIC_TECTONICA_PATH` | the app folder | Where `tectonica.dll` is NETLOADed from (relocatable). |
+| `max_workers` | `DWGMAGIC_MAX_WORKERS` | `2` | Simultaneous AutoCAD console processes. |
+| `job_timeout` | `DWGMAGIC_JOB_TIMEOUT` | `1800` | Seconds before a hung job is killed. |
+| `continue_on_error` | `DWGMAGIC_CONTINUE_ON_ERROR` | `false` | Keep going when individual jobs fail. |
+| `xref_xplode_toggle` | `DWGMAGIC_XREF_EXPLODE` | `true` | Use the tecbxt bind/explode path. |
+| `template_roots` | `DWGMAGIC_TEMPLATE_ROOT` | bundled | Extra template search roots. |
+| `log_dir` / `log_level` / `log_encoding` | `DWGMAGIC_LOG_DIR` / `_LOG_LEVEL` / `_LOG_ENCODING` | `logs` / `DEBUG` / `utf-8` | Logging behaviour. |
+| `script_encoding` | — | `cp1251` | Encoding of generated `.scr` files. |
+| `check_updates` | `DWGMAGIC_CHECK_UPDATES` | `true` | GitHub release check on GUI startup. |
+
+## Building tectonica.dll
+Generated `.scr` scripts `NETLOAD` `tectonica.dll` from the application folder; it is not committed to this repo and must be built from the `vendor/tectonica` submodule:
+```powershell
+./build_tectonica.ps1                 # builds Release config, copies tectonica.dll to the repo root
+./build_tectonica.ps1 -Configuration Debug
+```
+tectonica targets AutoCAD 2025's managed API (`net8.0-windows`). Building requires:
+- The ObjectARX 2025 managed reference assemblies (`AcCoreMgd.dll`, `AcDbMgd.dll`, `AcMgd.dll`, `AcDx.dll`, plus their dependents) copied from the ObjectARX 2025 SDK's `inc/` folder into `C:\Autodesk\ObjectARX2025\inc\` (the path referenced by `vendor/tectonica/tectonica/tectonica.csproj`).
+- MSBuild (Visual Studio or Build Tools) and the .NET 8 SDK.
+
+Because the ObjectARX SDK is proprietary, CI does **not** build the DLL; release archives contain only the Python application, and the updater deliberately preserves your locally built copy. Re-run `build_tectonica.ps1` whenever `vendor/tectonica` changes (`git submodule update --remote`).
+
+## Troubleshooting a failed run
+Inside the project folder:
+- `logs/run.log` — chronological log of the whole run, all components.
+- `logs/jobs/<script>.out.txt` — raw AutoCAD console output per job.
+- `logs/run_<timestamp>.json` — the run manifest: settings snapshot, stage timings, per-job exit codes/durations/failure reasons, deliverable status.
+
+The GUI shows the same information live (Tasks tab → select a job for its output).
 
 ## Project Structure
-- `dwgmagic/core/` – pipeline primitives and stage implementations.
-- `dwgmagic/integrations/` – AutoCAD runner/coordinator abstractions.
-- `dwgmagic/gui/` – Tkinter application for monitoring runs visually.
-- `dwgmagic/ui/` – shared listeners for CLI and GUI progress reporting.
-- `templates/` – packaged Jinja templates used to generate AutoCAD scripts.
+- `dwgmagic/core/` — pipeline primitives and stage implementations.
+- `dwgmagic/integrations/` — AutoCAD runner/coordinator (subprocess management, discovery).
+- `dwgmagic/gui/` — CustomTkinter application and persisted UI state.
+- `dwgmagic/ui/` — shared progress listeners for CLI and GUI.
+- `dwgmagic/templates/` — packaged Jinja templates for AutoCAD script generation.
+- `dwgmagic/classify.py` — the single source of truth for the sheet/view file-naming convention.
+- `dwgmagic/manifest.py` — run manifests and summaries.
+- `dwgmagic/update.py` — GitHub release update checks.
 
-## Testing
-Run the full test suite with:
+## Testing & CI
 ```bash
 pytest
 ```
-The tests cover configuration precedence, preprocessing reruns, script generation, AutoCAD job orchestration, and pipeline control flow.
+GitHub Actions runs the test suite on every push/PR (`.github/workflows/ci.yml`). Tagging `vX.Y.Z` (matching `dwgmagic.__version__`) creates a GitHub release with a source archive (`.github/workflows/release.yml`), which the in-app updater picks up.
 
 ## Contributing & Support
 Issues and pull requests are welcome. When reporting bugs, include:
 - The command you ran (CLI arguments or GUI launch instructions).
-- Relevant log snippets from `logs/` or the GUI Activity pane.
-- AutoCAD return codes, if applicable.
-
-For day-to-day usage guidance, see the comments at the top of `main.py` and the logging output produced during runs.
+- The run manifest and relevant snippets from `logs/run.log`.
+- AutoCAD job output from `logs/jobs/`, if applicable.

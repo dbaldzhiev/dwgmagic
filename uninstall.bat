@@ -8,11 +8,13 @@ if "%LOCALAPPDATA%"=="" (
 set "APP_NAME=DWGMAGIC"
 set "INSTALL_DIR=%LOCALAPPDATA%\dwgmagic"
 set "CONTEXT_KEY=Software\Classes\Directory\shell\DWGMAGIC"
+set "CONTEXT_BG_KEY=Software\Classes\Directory\Background\shell\DWGMAGIC"
 set "DESKTOP_LINK=%USERPROFILE%\Desktop\%APP_NAME% GUI.lnk"
 set "PUBLIC_DESKTOP=%PUBLIC%\Desktop\%APP_NAME% GUI.lnk"
 
-echo Removing context menu entry...
+echo Removing context menu entries...
 reg delete "HKCU\%CONTEXT_KEY%" /f >nul 2>nul
+reg delete "HKCU\%CONTEXT_BG_KEY%" /f >nul 2>nul
 
 echo Removing desktop shortcuts...
 if exist "%DESKTOP_LINK%" del /f /q "%DESKTOP_LINK%"

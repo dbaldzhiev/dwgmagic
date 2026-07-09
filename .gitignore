@@ -1,6 +1,16 @@
 __pycache__
 .vscode
 .venv
+venv
 .conda
 .pytest_cache
+.ruff_cache
+.mypy_cache
 sample_data
+dist
+build
+*.egg-info
+
+# Built AutoCAD plugin (compiled from vendor/tectonica, see build_tectonica.ps1)
+/tectonica.dll
+/tectonica.pdb
