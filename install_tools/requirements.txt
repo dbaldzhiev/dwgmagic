@@ -1,9 +1,0 @@
-# requirements.txt
-
-Jinja2==3.1.4
-rich==13.7.1
-customtkinter==5.2.2
-packaging
-tkinterdnd2
-
-
