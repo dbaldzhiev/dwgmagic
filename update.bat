@@ -12,5 +12,6 @@ if not exist "%APP_DIR%update.ps1" (
 )
 REM Run the updater from TEMP so it can safely replace the application files.
 copy /y "%APP_DIR%update.ps1" "%TEMP%\dwgmagic_update.ps1" >nul
-powershell -NoProfile -ExecutionPolicy Bypass -File "%TEMP%\dwgmagic_update.ps1" -AppDir "%APP_DIR%." %RELAUNCH%
-exit /b %errorlevel%
+REM exit /b must share the line: this script gets overwritten mid-run by the
+REM update itself, and cmd would otherwise resume reading it at a stale offset.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%TEMP%\dwgmagic_update.ps1" -AppDir "%APP_DIR%." %RELAUNCH% & exit /b
